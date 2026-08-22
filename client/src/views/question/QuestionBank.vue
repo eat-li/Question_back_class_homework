@@ -63,7 +63,7 @@
           <el-option v-for="t in knowledgeOptions" :key="t" :label="t" :value="t" />
         </el-select>
       </el-form-item>
-      <el-form-item label="题目内容">
+      <el-form-item label="补充说明">
         <RichEditor v-model="form.body" />
       </el-form-item>
       <el-form-item label="答案与解析">

@@ -160,7 +160,7 @@
         <div v-else>{{ JSON.stringify(currentQuestion.options) }}</div>
       </div>
       <div v-if="currentQuestion.body" class="q-section">
-        <div class="q-label">题目内容</div>
+        <div class="q-label">补充说明</div>
         <RichContent :html="currentQuestion.body" />
       </div>
       <div v-if="currentQuestion.answer" class="q-section">

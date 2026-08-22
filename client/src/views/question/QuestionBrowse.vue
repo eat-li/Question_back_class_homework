@@ -5,7 +5,7 @@
       <div class="filter-row">
         <el-input
           v-model="keyword"
-          placeholder="搜索题干 / 题目内容"
+          placeholder="搜索题干 / 补充说明"
           clearable
           style="width: 240px"
           @keyup.enter="load"
