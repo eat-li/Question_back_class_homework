@@ -19,7 +19,7 @@
         <div class="block-title">学生信息</div>
       </template>
       <p class="desc">
-        把学生名单导出为 JSON 文件；下次（或换电脑后）直接导入即可恢复。导入时按「学号」判断，已存在的学生会被更新。
+        把学生名单导出为 JSON 文件；下次（或换电脑后）直接导入即可恢复。导入时按「姓名」判断，已存在的学生会被更新。
       </p>
       <div class="actions">
         <el-button @click="downloadStudents">导出学生 JSON</el-button>

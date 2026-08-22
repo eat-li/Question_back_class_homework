@@ -132,8 +132,7 @@
         </template>
       </el-table-column>
       <el-table-column prop="name" label="姓名" />
-      <el-table-column prop="studentNo" label="学号" />
-      <el-table-column prop="className" label="班级" />
+      <el-table-column prop="grade" label="年级" />
     </el-table>
 
     <template #footer>
@@ -226,7 +225,7 @@
   <el-dialog v-model="scoreVisible" title="录入成绩" width="560px">
     <el-table :data="scoreRows" border max-height="480">
       <el-table-column prop="name" label="学生" width="120" />
-      <el-table-column prop="className" label="班级" width="140" />
+      <el-table-column prop="grade" label="年级" width="100" />
       <el-table-column label="得分">
         <template #default="{ row }">
           <el-input-number v-model="row.score" :min="0" :precision="1" size="small" />
@@ -468,7 +467,7 @@ const buildHomeworkHtml = () => {
       ${layout.schoolName ? `<div style="font-size:${fs + 2}px;font-weight:600;letter-spacing:3px;">${escapeHtml(layout.schoolName)}</div>` : ''}
       <div style="font-size:${fs + 6}px;font-weight:700;margin:6px 0;">${escapeHtml(title)}</div>
       <div style="font-size:${fs - 2}px;color:#555;display:flex;justify-content:space-between;align-items:center;padding:0 6px;">
-        ${layout.showNameLine ? `<span>姓名：${fillLine(st?.name)}　年级：${fillLine(st?.className)}　分数：${fillLine('')}</span>` : '<span></span>'}
+        ${layout.showNameLine ? `<span>姓名：${fillLine(st?.name)}　年级：${fillLine(st?.grade)}　分数：${fillLine('')}</span>` : '<span></span>'}
         ${layout.showScore ? `<span>总分：${total} 分</span>` : ''}
       </div>
     </div>`
@@ -615,7 +614,7 @@ const openScore = async (row: any) => {
     .map((st: any) => ({
       id: st.id,
       name: st.name,
-      className: st.className || '—',
+      grade: st.grade || '—',
       score: scoreMap.get(st.id) ?? 0
     }))
   scoreHomeworkId.value = row.id
