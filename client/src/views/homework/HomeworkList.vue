@@ -184,7 +184,6 @@
       <div class="export-options">
         <el-form label-width="90px" size="small">
           <el-form-item label="显示答案"><el-switch v-model="layout.showAnswer" /></el-form-item>
-          <el-form-item label="显示解析"><el-switch v-model="layout.showAnalysis" /></el-form-item>
           <el-form-item label="字号">
             <el-radio-group v-model="layout.fontSize">
               <el-radio-button value="14">小</el-radio-button>
@@ -424,7 +423,6 @@ const exportStudents = ref<any[]>([])
 
 const layout = reactive({
   showAnswer: false,
-  showAnalysis: false,
   fontSize: '16', // px
   lineHeight: '1.8',
   showAnswerArea: true,
@@ -502,8 +500,7 @@ const buildHomeworkHtml = () => {
         ${opts}
         ${q.body ? `<div style="margin-top:4px;">${q.body}</div>` : ''}
         ${layout.showAnswerArea ? `<div style="height:${layout.answerAreaHeight}px;"></div>` : ''}
-        ${layout.showAnswer && q.answer ? `<div style="color:#c0392b;margin-top:4px;"><b>【答案】</b>${escapeHtml(q.answer)}</div>` : ''}
-        ${layout.showAnalysis && q.analysis ? `<div style="color:#7f8c8d;margin-top:2px;"><b>【解析】</b>${escapeHtml(q.analysis)}</div>` : ''}
+        ${layout.showAnswer && q.answer ? `<div style="color:#c0392b;margin-top:4px;"><b>【答案与解析】</b>${q.answer}</div>` : ''}
       </div>`
       })
       .join('')

@@ -64,15 +64,9 @@
           </el-button>
         </div>
 
-        <div v-if="expanded.has(q.id)" class="q-answer">
-          <div v-if="q.answer" class="answer-line">
-            <span class="label">答案</span>
-            <span class="text">{{ q.answer }}</span>
-          </div>
-          <div v-if="q.analysis" class="analysis-line">
-            <span class="label">解析</span>
-            <span class="text">{{ q.analysis }}</span>
-          </div>
+        <div v-if="expanded.has(q.id)" class="q-answer" @click="onContentClick">
+          <div class="answer-label">答案与解析</div>
+          <RichContent :html="q.answer || ''" />
         </div>
       </div>
     </div>
@@ -284,7 +278,8 @@ onMounted(() => {
 }
 /* 限制卡片内图片大小，避免大图撑满整屏 */
 .q-title :deep(img),
-.q-body :deep(img) {
+.q-body :deep(img),
+.q-answer :deep(img) {
   max-width: 100%;
   max-height: 360px;
   object-fit: contain;
@@ -341,24 +336,10 @@ onMounted(() => {
   flex-direction: column;
   gap: 8px;
 }
-.answer-line,
-.analysis-line {
-  display: flex;
-  gap: 8px;
-  font-size: 14px;
-  line-height: 1.7;
-}
-.label {
-  flex-shrink: 0;
+.answer-label {
   font-weight: 700;
-  color: var(--moss-deep);
-}
-.answer-line .label {
   color: #c0392b;
-}
-.text {
-  white-space: pre-wrap;
-  word-break: break-word;
+  margin-bottom: 6px;
 }
 
 .pager {

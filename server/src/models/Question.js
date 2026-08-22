@@ -7,6 +7,5 @@ module.exports = (sequelize, DataTypes) =>
     knowledgeTag: { type: DataTypes.STRING(100), comment: '知识点标签' },
     body: { type: DataTypes.TEXT, comment: '题目内容(富文本/LaTeX)' },
     options: { type: DataTypes.JSON, comment: '选项(客观题)' },
-    answer: { type: DataTypes.TEXT, comment: '参考答案' },
-    analysis: { type: DataTypes.TEXT, comment: '解析' }
+    answer: { type: DataTypes.TEXT, comment: '答案与解析(富文本HTML，可含图片)' }
   })

@@ -1,5 +1,5 @@
 <template>
-  <div class="rich-editor">
+  <div class="rich-editor" :class="{ 're-fullscreen': isFullscreen }">
     <div v-if="editor" class="re-toolbar">
       <el-tooltip content="加粗" placement="top" :show-after="400">
         <button type="button" :class="{ active: editor.isActive('bold') }" @click="editor.chain().focus().toggleBold().run()">
@@ -46,6 +46,12 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6" /><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" /></svg>
         </button>
       </el-tooltip>
+      <el-tooltip :content="isFullscreen ? '退出全屏 (Esc)' : '全屏'" placement="top" :show-after="400">
+        <button type="button" :class="{ active: isFullscreen }" @click="toggleFullscreen">
+          <svg v-if="!isFullscreen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3" /><path d="M21 8V5a2 2 0 0 0-2-2h-3" /><path d="M3 16v3a2 2 0 0 0 2 2h3" /><path d="M16 21h3a2 2 0 0 0 2-2v-3" /></svg>
+          <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3" /><path d="M21 8h-3a2 2 0 0 1-2-2V3" /><path d="M3 16h3a2 2 0 0 1 2 2v3" /><path d="M16 21v-3a2 2 0 0 1 2-2h3" /></svg>
+        </button>
+      </el-tooltip>
     </div>
 
     <editor-content :editor="editor" class="re-content" @click="onContentClick" />
@@ -73,7 +79,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
@@ -85,6 +91,14 @@ const props = defineProps<{ modelValue: string }>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: string): void }>()
 
 const fileInput = ref<HTMLInputElement>()
+
+// 全屏编辑模式
+const isFullscreen = ref(false)
+const toggleFullscreen = () => {
+  isFullscreen.value = !isFullscreen.value
+  document.body.style.overflow = isFullscreen.value ? 'hidden' : ''
+  nextTick(() => editor.value?.commands.focus())
+}
 
 // 图片节点增加 width 属性，用于调整大小
 const ResizableImage = Image.extend({
@@ -245,11 +259,16 @@ const closePreview = () => {
 }
 
 const onKeydown = (e: KeyboardEvent) => {
-  if (e.key === 'Escape' && preview.visible) closePreview()
+  if (e.key !== 'Escape') return
+  if (preview.visible) closePreview()
+  else if (isFullscreen.value) toggleFullscreen()
 }
 
 onMounted(() => window.addEventListener('keydown', onKeydown))
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
+  document.body.style.overflow = ''
+})
 </script>
 
 <style scoped>
@@ -257,6 +276,30 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   overflow: hidden;
+}
+/* —— 全屏编辑模式 —— */
+.rich-editor.re-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  border: none;
+  border-radius: 0;
+  background: #fffdf9;
+  display: flex;
+  flex-direction: column;
+}
+.rich-editor.re-fullscreen .re-toolbar {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+.rich-editor.re-fullscreen .re-content {
+  flex: 1;
+  max-height: none;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+.rich-editor.re-fullscreen .re-content :deep(.ProseMirror) {
+  min-height: calc(100vh - 140px);
 }
 .re-toolbar {
   display: flex;
