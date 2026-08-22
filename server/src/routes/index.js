@@ -5,5 +5,7 @@ router.use('/students', require('./student.routes'))
 router.use('/questions', require('./question.routes'))
 router.use('/homeworks', require('./homework.routes'))
 router.use('/upload', require('./upload.routes'))
+router.use('/backup', require('./backup.routes'))
+router.use('/stats', require('./stats.routes'))
 
 module.exports = router

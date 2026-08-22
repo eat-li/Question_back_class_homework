@@ -19,6 +19,21 @@ exports.list = async (req, res, next) => {
   }
 }
 
+// 知识点标签列表（去重，供筛选下拉使用）
+exports.tags = async (req, res, next) => {
+  try {
+    const rows = await Question.findAll({
+      attributes: ['knowledgeTag'],
+      where: { knowledgeTag: { [Op.ne]: null, [Op.ne]: '' } },
+      group: ['knowledgeTag'],
+      order: [['knowledgeTag', 'ASC']]
+    })
+    ok(res, rows.map((r) => r.knowledgeTag).filter(Boolean))
+  } catch (e) {
+    next(e)
+  }
+}
+
 exports.create = async (req, res, next) => {
   try {
     const question = await Question.create(req.body)

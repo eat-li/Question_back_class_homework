@@ -3,6 +3,8 @@ const router = require('express').Router()
 const c = require('../controllers/student.controller')
 
 router.get('/', c.list)
+router.get('/export', c.export)
+router.post('/import', c.import)
 router.post('/', c.create)
 router.get('/:id', c.get)
 router.patch('/:id', c.update)

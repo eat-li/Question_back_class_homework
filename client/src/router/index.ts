@@ -7,8 +7,14 @@ const router = createRouter({
     {
       path: '/',
       component: MainLayout,
-      redirect: '/students',
+      redirect: '/dashboard',
       children: [
+        {
+          path: 'dashboard',
+          name: 'dashboard',
+          component: () => import('../views/Dashboard.vue'),
+          meta: { title: '首页' }
+        },
         {
           path: 'students',
           name: 'students',
@@ -22,10 +28,22 @@ const router = createRouter({
           meta: { title: '题库管理' }
         },
         {
+          path: 'browse',
+          name: 'browse',
+          component: () => import('../views/question/QuestionBrowse.vue'),
+          meta: { title: '题目浏览' }
+        },
+        {
           path: 'homeworks',
           name: 'homeworks',
           component: () => import('../views/homework/HomeworkList.vue'),
           meta: { title: '作业管理' }
+        },
+        {
+          path: 'backup',
+          name: 'backup',
+          component: () => import('../views/system/DataBackup.vue'),
+          meta: { title: '数据备份' }
         }
       ]
     }

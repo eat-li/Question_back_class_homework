@@ -11,9 +11,12 @@
       </div>
 
       <el-menu router :default-active="$route.path" class="menu">
+        <el-menu-item index="/dashboard">首页</el-menu-item>
         <el-menu-item index="/students">学生管理</el-menu-item>
         <el-menu-item index="/questions">题库管理</el-menu-item>
+        <el-menu-item index="/browse">题目浏览</el-menu-item>
         <el-menu-item index="/homeworks">作业管理</el-menu-item>
+        <el-menu-item index="/backup">数据备份</el-menu-item>
       </el-menu>
 
       <div class="aside-foot">
