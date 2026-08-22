@@ -5,6 +5,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, nextTick } from 'vue'
 import renderMathInElement from 'katex/contrib/auto-render'
+import { mathDelimiters } from '../utils/math'
 
 const props = defineProps<{ html: string }>()
 const root = ref<HTMLElement>()
@@ -13,7 +14,7 @@ const root = ref<HTMLElement>()
 const renderMath = () => {
   if (!root.value) return
   renderMathInElement(root.value, {
-    delimiters: [{ left: '$', right: '$', display: false }],
+    delimiters: mathDelimiters,
     throwOnError: false
   })
 }

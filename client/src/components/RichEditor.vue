@@ -94,6 +94,7 @@ import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
 import { uploadImage } from '../api/upload'
 import { formatQuestion } from '../api/ai'
 import { loadAiConfig } from '../utils/aiConfig'
+import { mathRegex } from '../utils/math'
 
 const props = defineProps<{ modelValue: string }>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: string): void }>()
@@ -156,9 +157,16 @@ const ResizableImage = Image.extend({
   }
 })
 
+// 扩展公式识别正则，支持 $...$ / $$...$$ / \(...\) / \[...\] 四种定界符
+const MathExt = Mathematics.extend({
+  addOptions() {
+    return { ...this.parent?.(), regex: mathRegex }
+  }
+})
+
 const editor = useEditor({
   content: props.modelValue || '',
-  extensions: [StarterKit, ResizableImage, Mathematics],
+  extensions: [StarterKit, ResizableImage, MathExt],
   editorProps: {
     // 处理粘贴图片（Ctrl+V 截图）：上传到 OSS 后插入
     handlePaste: (_view, event) => {

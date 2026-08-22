@@ -254,6 +254,7 @@ import { getQuestions } from '../../api/question'
 import { getStudents } from '../../api/student'
 import renderMathInElement from 'katex/contrib/auto-render'
 import katexCss from 'katex/dist/katex.min.css?raw'
+import { mathDelimiters } from '../../utils/math'
 import RichContent from '../../components/RichContent.vue'
 
 const list = ref([])
@@ -525,7 +526,7 @@ const previewRef = ref<HTMLElement>()
 const renderPreviewMath = () => {
   if (previewRef.value) {
     renderMathInElement(previewRef.value, {
-      delimiters: [{ left: '$', right: '$', display: false }],
+      delimiters: mathDelimiters,
       throwOnError: false
     })
   }
@@ -542,7 +543,7 @@ const renderMathHtml = (html: string): string => {
   const div = document.createElement('div')
   div.innerHTML = html
   renderMathInElement(div, {
-    delimiters: [{ left: '$', right: '$', display: false }],
+    delimiters: mathDelimiters,
     throwOnError: false
   })
   return div.innerHTML
