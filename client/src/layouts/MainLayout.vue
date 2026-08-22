@@ -19,6 +19,8 @@
         <el-menu-item index="/backup">数据备份</el-menu-item>
       </el-menu>
 
+      <QuickLinks />
+
       <div class="aside-foot">
         <div class="foot-line"></div>
         <div class="foot-text">认真教书 · 温柔生活</div>
@@ -49,6 +51,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import QuickLinks from '../components/QuickLinks.vue'
 
 const today = ref(
   new Date().toLocaleDateString('zh-CN', {
