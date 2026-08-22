@@ -44,6 +44,12 @@ const router = createRouter({
           name: 'backup',
           component: () => import('../views/system/DataBackup.vue'),
           meta: { title: '数据备份' }
+        },
+        {
+          path: 'settings',
+          name: 'settings',
+          component: () => import('../views/system/SystemSettings.vue'),
+          meta: { title: '系统设置' }
         }
       ]
     }

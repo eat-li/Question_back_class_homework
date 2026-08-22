@@ -36,6 +36,11 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 7V4H6l6 8-6 8h12v-3" /></svg>
         </button>
       </el-tooltip>
+      <el-tooltip content="AI 排版" placement="top" :show-after="400">
+        <button type="button" :disabled="aiLoading" @click="runAiFormat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 2.6l1.8 4.7 4.7 1.8-4.7 1.8-1.8 4.7-1.8-4.7-4.7-1.8 4.7-1.8z" /><path d="M18 14.5l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7z" /></svg>
+        </button>
+      </el-tooltip>
       <el-tooltip content="撤销" placement="top" :show-after="400">
         <button type="button" @click="editor.chain().focus().undo().run()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6" /><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" /></svg>
@@ -80,17 +85,58 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
 import { Mathematics } from '@tiptap/extension-mathematics'
 import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
 import { uploadImage } from '../api/upload'
+import { formatQuestion } from '../api/ai'
+import { loadAiConfig } from '../utils/aiConfig'
 
 const props = defineProps<{ modelValue: string }>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: string): void }>()
 
 const fileInput = ref<HTMLInputElement>()
+
+/* ===================== AI 智能排版 ===================== */
+const router = useRouter()
+const aiLoading = ref(false)
+
+const runAiFormat = async () => {
+  const text = editor.value?.getText().trim()
+  if (!text) {
+    ElMessage.warning('请先在编辑器中粘贴题目内容')
+    return
+  }
+  const cfg = loadAiConfig()
+  if (!cfg.apiKey) {
+    try {
+      await ElMessageBox.confirm('尚未配置 AI API Key，是否前往「系统设置」进行配置？', '提示', {
+        confirmButtonText: '去设置',
+        cancelButtonText: '取消',
+        type: 'warning'
+      })
+      router.push('/settings')
+    } catch {
+      /* 用户取消 */
+    }
+    return
+  }
+  aiLoading.value = true
+  const loading = ElLoading.service({ text: 'AI 排版中，请稍候…', background: 'rgba(0,0,0,0.3)' })
+  try {
+    const { html } = await formatQuestion({ text, apiKey: cfg.apiKey, baseUrl: cfg.baseUrl, model: cfg.model })
+    editor.value?.commands.setContent(html || '', false)
+    ElMessage.success('排版完成')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '排版失败，请检查 API Key 或网络')
+  } finally {
+    loading.close()
+    aiLoading.value = false
+  }
+}
 
 // 全屏编辑模式
 const isFullscreen = ref(false)
@@ -363,6 +409,10 @@ onBeforeUnmount(() => {
 }
 .re-hidden {
   display: none;
+}
+.re-toolbar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* —— 图片全屏预览弹层 —— */
