@@ -16,6 +16,7 @@
         <el-menu-item index="/questions">题库管理</el-menu-item>
         <el-menu-item index="/browse">题目浏览</el-menu-item>
         <el-menu-item index="/homeworks">作业管理</el-menu-item>
+        <el-menu-item index="/homework-view">查看作业</el-menu-item>
         <el-menu-item index="/backup">数据备份</el-menu-item>
         <el-menu-item index="/settings">系统设置</el-menu-item>
       </el-menu>

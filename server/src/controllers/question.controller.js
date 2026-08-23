@@ -11,7 +11,12 @@ exports.list = async (req, res, next) => {
     if (keyword) where.title = { [Op.like]: `%${keyword}%` }
     if (type) where.type = type
     if (difficulty) where.difficulty = Number(difficulty)
-    if (knowledgeTag) where.knowledgeTag = knowledgeTag
+    if (knowledgeTag === '__empty__') {
+      // 约定值：筛选「未分类」题目（知识点为空）
+      where.knowledgeTag = { [Op.or]: [null, ''] }
+    } else if (knowledgeTag) {
+      where.knowledgeTag = knowledgeTag
+    }
     const list = await Question.findAll({ where, order: [['id', 'DESC']] })
     ok(res, list)
   } catch (e) {

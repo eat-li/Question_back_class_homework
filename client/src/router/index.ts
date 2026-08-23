@@ -28,6 +28,12 @@ const router = createRouter({
           meta: { title: '题库管理' }
         },
         {
+          path: 'questions/knowledge/:tag',
+          name: 'knowledgeQuestions',
+          component: () => import('../views/question/KnowledgeQuestions.vue'),
+          meta: { title: '知识点题目' }
+        },
+        {
           path: 'browse',
           name: 'browse',
           component: () => import('../views/question/QuestionBrowse.vue'),
@@ -38,6 +44,12 @@ const router = createRouter({
           name: 'homeworks',
           component: () => import('../views/homework/HomeworkList.vue'),
           meta: { title: '作业管理' }
+        },
+        {
+          path: 'homework-view',
+          name: 'homeworkView',
+          component: () => import('../views/homework/HomeworkView.vue'),
+          meta: { title: '查看作业' }
         },
         {
           path: 'backup',

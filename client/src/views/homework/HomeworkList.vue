@@ -6,11 +6,19 @@
 
     <el-table :data="list" border stripe v-loading="loading">
       <el-table-column prop="title" label="作业标题" />
-      <el-table-column prop="status" label="状态" width="100" />
+      <el-table-column label="状态" width="100">
+        <template #default="{ row }">
+          <el-tag :type="statusTagType(row.status)" size="small">{{ statusLabel(row.status) }}</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column label="题目数" width="90">
         <template #default="{ row }">{{ (row.questionIds || []).length }}</template>
       </el-table-column>
-      <el-table-column prop="endAt" label="截止时间" width="180" />
+      <el-table-column label="截止时间" width="180">
+        <template #default="{ row }">
+          <span :class="{ 'end-at--expired': isExpired(row.endAt) }">{{ formatDateTime(row.endAt) }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="300">
         <template #default="{ row }">
           <el-button size="small" @click="openScore(row)">打分</el-button>
@@ -216,8 +224,13 @@
       </div>
     </div>
     <template #footer>
-      <el-button @click="exportVisible = false">取消</el-button>
-      <el-button type="primary" @click="doExport">导出 PDF</el-button>
+      <div class="export-footer">
+        <span class="export-tip">提示：弹出打印窗口后，请在打印对话框的「更多设置」中取消勾选「页眉和页脚」，即可去掉左下角的 about:blank 与左上角的日期时间。</span>
+        <span class="export-actions">
+          <el-button @click="exportVisible = false">取消</el-button>
+          <el-button type="primary" @click="doExport">导出 PDF</el-button>
+        </span>
+      </div>
     </template>
   </el-dialog>
 
@@ -288,6 +301,36 @@ const typeMap: Record<string, string> = {
   solve: '解答题'
 }
 const typeLabel = (t: string) => typeMap[t] || t
+
+// —— 状态与截止时间的展示辅助 ——
+const statusMap: Record<
+  string,
+  { label: string; type: 'success' | 'warning' | 'info' | 'primary' | 'danger' }
+> = {
+  draft: { label: '草稿', type: 'info' },
+  published: { label: '已发布', type: 'success' },
+  closed: { label: '已截止', type: 'warning' }
+}
+const statusLabel = (s: string) => statusMap[s]?.label || s || '—'
+const statusTagType = (s: string): 'success' | 'warning' | 'info' | 'primary' | 'danger' =>
+  statusMap[s]?.type || 'info'
+
+// 日期时间格式化：DATE / ISO / 字符串 → YYYY-MM-DD HH:mm
+const formatDateTime = (d: any) => {
+  if (!d) return '—'
+  const date = new Date(d)
+  if (Number.isNaN(date.getTime())) return String(d)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+// 截止时间是否已过（用于标红提示）
+const isExpired = (d: any) => {
+  if (!d) return false
+  const date = new Date(d)
+  if (Number.isNaN(date.getTime())) return false
+  return date.getTime() < Date.now()
+}
 
 // 富文本 HTML 转纯文本，用于列表显示
 const stripHtml = (html: string) =>
@@ -708,5 +751,24 @@ onMounted(load)
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
   border-radius: 2px;
   min-height: 100%;
+}
+.export-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  text-align: left;
+}
+.export-tip {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.5;
+}
+.export-actions {
+  flex-shrink: 0;
+}
+.end-at--expired {
+  color: #f56c6c;
+  font-weight: 600;
 }
 </style>
