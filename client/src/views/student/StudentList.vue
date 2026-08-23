@@ -11,8 +11,8 @@
       <el-select v-model="grade" placeholder="年级" clearable style="width: 140px">
         <el-option v-for="g in gradeOptions" :key="g" :label="g" :value="g" />
       </el-select>
-      <el-button type="primary" @click="load">查询</el-button>
-      <el-button type="primary" @click="openDialog()">新增学生</el-button>
+      <el-button type="primary" :icon="Search" @click="load">查询</el-button>
+      <el-button type="primary" :icon="Plus" @click="openDialog()">新增学生</el-button>
     </div>
 
     <el-table :data="list" border stripe v-loading="loading">
@@ -20,10 +20,10 @@
       <el-table-column prop="grade" label="年级" />
       <el-table-column prop="contact" label="联系方式" />
       <el-table-column prop="remark" label="备注" />
-      <el-table-column label="操作" width="160">
+      <el-table-column label="操作" width="180">
         <template #default="{ row }">
-          <el-button size="small" @click="openDialog(row)">编辑</el-button>
-          <el-button size="small" type="danger" @click="remove(row)">删除</el-button>
+          <el-button size="small" :icon="Edit" @click="openDialog(row)">编辑</el-button>
+          <el-button size="small" type="danger" :icon="Delete" @click="remove(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -49,6 +49,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
+import { Search, Plus, Edit, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getStudents, createStudent, updateStudent, deleteStudent } from '../../api/student'
 

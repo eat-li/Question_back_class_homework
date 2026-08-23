@@ -3,7 +3,9 @@
     <!-- 统计卡片 -->
     <div class="stat-grid">
       <div v-for="c in statCards" :key="c.label" class="stat-card">
-        <div class="stat-icon" :style="{ background: c.bg, color: c.color }">{{ c.icon }}</div>
+        <div class="stat-icon" :style="{ background: c.bg, color: c.color }">
+          <el-icon :size="22"><component :is="c.icon" /></el-icon>
+        </div>
         <div class="stat-info">
           <div class="stat-value">{{ c.value }}</div>
           <div class="stat-label">{{ c.label }}</div>
@@ -33,6 +35,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { Document, User, Notebook, Trophy } from '@element-plus/icons-vue'
 import { getStats } from '../api/stats'
 import * as echarts from 'echarts/core'
 import { PieChart, BarChart } from 'echarts/charts'
@@ -54,10 +57,10 @@ const typeLabel = (t: string) =>
 const statCards = computed(() => {
   const c = stats.value?.counts || {}
   return [
-    { label: '题目总数', value: c.questionCount ?? 0, icon: '📝', bg: '#e7efe8', color: '#56725a' },
-    { label: '学生人数', value: c.studentCount ?? 0, icon: '👥', bg: '#f5ecd7', color: '#a17c35' },
-    { label: '作业总数', value: c.homeworkCount ?? 0, icon: '📚', bg: '#e9edf3', color: '#5b6b82' },
-    { label: '成绩记录', value: c.submissionCount ?? 0, icon: '⭐', bg: '#f3e9e4', color: '#a06a5a' }
+    { label: '题目总数', value: c.questionCount ?? 0, icon: Document, bg: '#e3ece9', color: '#46645c' },
+    { label: '学生人数', value: c.studentCount ?? 0, icon: User, bg: '#f3eddf', color: '#a8874a' },
+    { label: '作业总数', value: c.homeworkCount ?? 0, icon: Notebook, bg: '#e9edf3', color: '#5b6b82' },
+    { label: '成绩记录', value: c.submissionCount ?? 0, icon: Trophy, bg: '#f3e9e4', color: '#a06a5a' }
   ]
 })
 
@@ -79,15 +82,15 @@ const renderCharts = () => {
   renderOne(typeRef.value!, {
     tooltip: { trigger: 'item', formatter: '{b}: {c} 题 ({d}%)' },
     legend: { bottom: 0, icon: 'circle' },
-    color: ['#6b8f71', '#c9a86a', '#8a9bb0'],
+    color: ['#5b7d74', '#c2a878', '#8a9bb0'],
     series: [
       {
         type: 'pie',
         radius: ['42%', '66%'],
         center: ['50%', '44%'],
         avoidLabelOverlap: true,
-        itemStyle: { borderRadius: 6, borderColor: '#fffdf9', borderWidth: 2 },
-        label: { formatter: '{b}\n{c} 题', fontSize: 12, color: '#3d3a34' },
+        itemStyle: { borderRadius: 6, borderColor: '#fbfdfc', borderWidth: 2 },
+        label: { formatter: '{b}\n{c} 题', fontSize: 12, color: '#3a403d' },
         data: typeData
       }
     ]
@@ -104,22 +107,22 @@ const renderCharts = () => {
     xAxis: {
       type: 'category',
       data: ['★1', '★2', '★3', '★4', '★5'],
-      axisLine: { lineStyle: { color: '#e7dfd0' } },
+      axisLine: { lineStyle: { color: '#dde5e1' } },
       axisTick: { show: false },
-      axisLabel: { color: '#8a8375' }
+      axisLabel: { color: '#7d8681' }
     },
     yAxis: {
       type: 'value',
       minInterval: 1,
-      splitLine: { lineStyle: { color: '#f0eadc' } },
-      axisLabel: { color: '#8a8375' }
+      splitLine: { lineStyle: { color: '#eaf0ed' } },
+      axisLabel: { color: '#7d8681' }
     },
     series: [
       {
         type: 'bar',
         data: diffData,
         barWidth: '46%',
-        itemStyle: { color: '#6b8f71', borderRadius: [6, 6, 0, 0] }
+        itemStyle: { color: '#5b7d74', borderRadius: [6, 6, 0, 0] }
       }
     ]
   })
@@ -135,23 +138,23 @@ const renderCharts = () => {
     xAxis: {
       type: 'value',
       minInterval: 1,
-      splitLine: { lineStyle: { color: '#f0eadc' } },
-      axisLabel: { color: '#8a8375' }
+      splitLine: { lineStyle: { color: '#eaf0ed' } },
+      axisLabel: { color: '#7d8681' }
     },
     yAxis: {
       type: 'category',
       inverse: true,
       data: know.map((k: any) => k.name),
-      axisLine: { lineStyle: { color: '#e7dfd0' } },
+      axisLine: { lineStyle: { color: '#dde5e1' } },
       axisTick: { show: false },
-      axisLabel: { color: '#5a544a' }
+      axisLabel: { color: '#4a514d' }
     },
     series: [
       {
         type: 'bar',
         data: know.map((k: any) => k.value),
         barWidth: '52%',
-        itemStyle: { color: '#c9a86a', borderRadius: [0, 6, 6, 0] }
+        itemStyle: { color: '#c2a878', borderRadius: [0, 6, 6, 0] }
       }
     ]
   })
@@ -198,6 +201,11 @@ onBeforeUnmount(() => {
   border-radius: var(--radius);
   padding: 20px 22px;
   box-shadow: var(--shadow-soft);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
 }
 .stat-icon {
   width: 48px;

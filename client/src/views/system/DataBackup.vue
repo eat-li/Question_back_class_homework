@@ -8,7 +8,7 @@
       <p class="desc">
         把全部题目、作业、学生名单和成绩打包成一个压缩包下载。建议定期下载并存到 U 盘或网盘，电脑出问题时可以据此恢复。
       </p>
-      <el-button type="primary" :loading="backupLoading" @click="downloadBackup">
+      <el-button type="primary" :icon="Download" :loading="backupLoading" @click="downloadBackup">
         下载备份压缩包
       </el-button>
     </el-card>
@@ -22,8 +22,8 @@
         把学生名单导出为 JSON 文件；下次（或换电脑后）直接导入即可恢复。导入时按「姓名」判断，已存在的学生会被更新。
       </p>
       <div class="actions">
-        <el-button @click="downloadStudents">导出学生 JSON</el-button>
-        <el-button type="primary" :loading="importing" @click="triggerImport">导入学生 JSON</el-button>
+        <el-button :icon="Download" @click="downloadStudents">导出学生 JSON</el-button>
+        <el-button type="primary" :icon="Upload" :loading="importing" @click="triggerImport">导入学生 JSON</el-button>
         <input
           ref="fileInput"
           type="file"
@@ -38,6 +38,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { Download, Upload } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { importStudents } from '../../api/student'
 

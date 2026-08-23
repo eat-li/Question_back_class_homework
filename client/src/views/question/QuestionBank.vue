@@ -8,8 +8,8 @@
         style="width: 200px"
         @keyup.enter="load"
       />
-      <el-button type="primary" @click="load">查询</el-button>
-      <el-button type="primary" @click="openCreate">新增题目</el-button>
+      <el-button type="primary" :icon="Search" @click="load">查询</el-button>
+      <el-button type="primary" :icon="Plus" @click="openCreate">新增题目</el-button>
     </div>
 
     <div v-loading="loading" class="kb-grid">
@@ -31,6 +31,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { Search, Plus } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { getQuestions } from '../../api/question'
 import QuestionFormDialog from '../../components/QuestionFormDialog.vue'
@@ -115,6 +116,6 @@ onMounted(load)
   gap: 8px;
   flex-wrap: wrap;
   font-size: 12px;
-  color: #909399;
+  color: var(--ink-soft);
 }
 </style>

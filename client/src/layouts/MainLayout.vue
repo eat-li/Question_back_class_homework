@@ -11,14 +11,14 @@
       </div>
 
       <el-menu router :default-active="$route.path" class="menu">
-        <el-menu-item index="/dashboard">首页</el-menu-item>
-        <el-menu-item index="/students">学生管理</el-menu-item>
-        <el-menu-item index="/questions">题库管理</el-menu-item>
-        <el-menu-item index="/browse">题目浏览</el-menu-item>
-        <el-menu-item index="/homeworks">作业管理</el-menu-item>
-        <el-menu-item index="/homework-view">查看作业</el-menu-item>
-        <el-menu-item index="/backup">数据备份</el-menu-item>
-        <el-menu-item index="/settings">系统设置</el-menu-item>
+        <el-menu-item index="/dashboard"><el-icon><House /></el-icon><span>首页</span></el-menu-item>
+        <el-menu-item index="/students"><el-icon><User /></el-icon><span>学生管理</span></el-menu-item>
+        <el-menu-item index="/questions"><el-icon><Collection /></el-icon><span>题库管理</span></el-menu-item>
+        <el-menu-item index="/browse"><el-icon><Reading /></el-icon><span>题目浏览</span></el-menu-item>
+        <el-menu-item index="/homeworks"><el-icon><Document /></el-icon><span>作业管理</span></el-menu-item>
+        <el-menu-item index="/homework-view"><el-icon><View /></el-icon><span>查看作业</span></el-menu-item>
+        <el-menu-item index="/backup"><el-icon><FolderOpened /></el-icon><span>数据备份</span></el-menu-item>
+        <el-menu-item index="/settings"><el-icon><Setting /></el-icon><span>系统设置</span></el-menu-item>
       </el-menu>
 
       <QuickLinks />
@@ -53,6 +53,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { House, User, Collection, Reading, Document, View, FolderOpened, Setting } from '@element-plus/icons-vue'
 import QuickLinks from '../components/QuickLinks.vue'
 
 const today = ref(
@@ -124,13 +125,17 @@ const today = ref(
   margin: 4px 12px;
   border-radius: 10px;
   padding-left: 20px !important;
-  color: #6a6255;
+  color: #4a514d;
   font-size: 14px;
   position: relative;
   transition: all 0.2s ease;
 }
+.menu :deep(.el-menu-item .el-icon) {
+  margin-right: 10px;
+  font-size: 16px;
+}
 .menu :deep(.el-menu-item:hover) {
-  background: #f6f0e3;
+  background: #eef3f1;
   color: var(--ink);
 }
 .menu :deep(.el-menu-item.is-active) {
@@ -176,7 +181,7 @@ const today = ref(
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(255, 253, 249, 0.7);
+  background: rgba(251, 253, 252, 0.7);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--line);
   padding: 0 28px;

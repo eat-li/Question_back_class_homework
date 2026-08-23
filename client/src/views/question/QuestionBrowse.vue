@@ -27,8 +27,8 @@
         >
           <el-option v-for="t in tags" :key="t" :label="t" :value="t" />
         </el-select>
-        <el-button type="primary" @click="load">查询</el-button>
-        <el-button @click="reset">重置</el-button>
+        <el-button type="primary" :icon="Search" @click="load">查询</el-button>
+        <el-button :icon="RefreshLeft" @click="reset">重置</el-button>
         <span class="count">共 {{ total }} 题</span>
       </div>
     </el-card>
@@ -93,6 +93,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { Search, RefreshLeft } from '@element-plus/icons-vue'
 import { getQuestions, getQuestionTags } from '../../api/question'
 import RichContent from '../../components/RichContent.vue'
 
@@ -251,8 +252,8 @@ onMounted(() => {
   color: var(--moss-deep);
 }
 .type-fill {
-  background: #f5ecd7;
-  color: #a17c35;
+  background: #f3eddf;
+  color: #a8874a;
 }
 .type-solve {
   background: #e9edf3;

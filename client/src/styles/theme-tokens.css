@@ -1,0 +1,93 @@
+/* ============================================================
+   主题变量文件 · 黛青雅致（celadon）
+   ------------------------------------------------------------
+   这里集中存放整套主题的颜色、圆角、阴影、字体，以及
+   Element Plus 的变量覆盖。想要切换主题时，只需替换本文件
+   （或在 main 里改引入另一个 themes/xxx.css）。
+
+   颜色集中在最上方，改几个色值即可整体换肤。
+   ============================================================ */
+
+:root {
+  /* —— 设计 token —— */
+  --paper: #f6f8f7; /* 暖白带青背景 */
+  --paper-deep: #edf1ef; /* 稍深青白 */
+  --side: #ecf0ee; /* 侧栏浅青白 */
+  --ink: #3a403d; /* 主文字（青墨） */
+  --ink-soft: #7d8681; /* 次级文字 */
+  --line: #dde5e1; /* 分隔线 */
+
+  --moss: #5b7d74; /* 青瓷绿主色 */
+  --moss-deep: #46645c; /* 深青瓷 */
+  --moss-soft: #e3ece9; /* 淡青瓷底 */
+
+  --accent: #c2a878; /* 暖金点缀 */
+
+  /* —— 圆角 —— */
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+
+  /* —— 阴影（青灰调） —— */
+  --shadow-soft: 0 1px 2px rgba(66, 86, 80, 0.05), 0 6px 20px rgba(66, 86, 80, 0.06);
+  --shadow-hover: 0 6px 16px rgba(66, 86, 80, 0.1), 0 14px 32px rgba(66, 86, 80, 0.1);
+
+  /* —— 字体 —— */
+  --font-display: 'Songti SC', 'STSong', 'Noto Serif SC', 'SimSun', 'Times New Roman', serif;
+  --font-body: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', system-ui, sans-serif;
+
+  /* ============================================================
+     Element Plus 主题变量覆盖
+     ============================================================ */
+  --el-color-primary: var(--moss);
+  --el-color-primary-light-3: #8ca49e;
+  --el-color-primary-light-5: #adbeba;
+  --el-color-primary-light-7: #ced8d5;
+  --el-color-primary-light-8: #dee5e3;
+  --el-color-primary-light-9: #eff2f1;
+  --el-color-primary-dark-2: var(--moss-deep);
+  --el-color-primary-rgb: 91, 125, 116;
+
+  --el-font-family: var(--font-body);
+
+  --el-border-radius-base: var(--radius-sm);
+  --el-border-radius-small: 6px;
+  --el-border-radius-round: 999px;
+
+  /* 背景 */
+  --el-bg-color: #fbfdfc;
+  --el-bg-color-page: var(--paper);
+  --el-bg-color-overlay: #fbfdfc;
+
+  /* 文字 */
+  --el-text-color-primary: var(--ink);
+  --el-text-color-regular: #4a514d;
+  --el-text-color-secondary: var(--ink-soft);
+  --el-text-color-placeholder: #a9b2ad;
+
+  /* 边框 */
+  --el-border-color: #d7e0dc;
+  --el-border-color-light: #e2e9e6;
+  --el-border-color-lighter: #eaf0ed;
+  --el-border-color-extra-light: #f1f5f3;
+
+  /* 填充 */
+  --el-fill-color: #e9efec;
+  --el-fill-color-light: #f0f5f3;
+  --el-fill-color-lighter: #f6faf8;
+  --el-fill-color-extra-light: #fbfdfc;
+  --el-fill-color-blank: #fbfdfc;
+
+  /* 菜单 */
+  --el-menu-bg-color: transparent;
+  --el-menu-text-color: #4a514d;
+  --el-menu-active-color: var(--moss-deep);
+  --el-menu-hover-bg-color: #eef3f1;
+  --el-menu-item-height: 46px;
+
+  /* 表格 */
+  --el-table-header-bg-color: #eef3f1;
+  --el-table-header-text-color: var(--ink);
+  --el-table-border-color: var(--line);
+  --el-table-row-hover-bg-color: #f2f6f4;
+}

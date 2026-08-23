@@ -1,7 +1,7 @@
 <template>
   <el-card>
     <div class="toolbar">
-      <el-button type="primary" @click="openCreate">发布作业</el-button>
+      <el-button type="primary" :icon="Plus" @click="openCreate">发布作业</el-button>
     </div>
 
     <el-table :data="list" border stripe v-loading="loading">
@@ -21,9 +21,9 @@
       </el-table-column>
       <el-table-column label="操作" width="300">
         <template #default="{ row }">
-          <el-button size="small" @click="openScore(row)">打分</el-button>
-          <el-button size="small" type="primary" @click="openExport(row)">导出 PDF</el-button>
-          <el-button size="small" type="danger" @click="remove(row)">删除</el-button>
+          <el-button size="small" :icon="Edit" @click="openScore(row)">打分</el-button>
+          <el-button size="small" type="primary" :icon="Download" @click="openExport(row)">导出 PDF</el-button>
+          <el-button size="small" type="danger" :icon="Delete" @click="remove(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -254,6 +254,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
+import { Plus, Edit, Download, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getHomeworks,
@@ -693,7 +694,7 @@ onMounted(load)
   gap: 8px;
 }
 .picked-count {
-  color: #909399;
+  color: var(--ink-soft);
   font-size: 13px;
 }
 .picker-toolbar {
@@ -716,17 +717,17 @@ onMounted(load)
 }
 .q-label {
   font-weight: 600;
-  color: #606266;
+  color: var(--ink);
   margin-bottom: 4px;
 }
 .q-text {
   white-space: pre-wrap;
   line-height: 1.6;
-  color: #303133;
+  color: var(--ink);
 }
 .q-option {
   line-height: 1.8;
-  color: #303133;
+  color: var(--ink);
 }
 .export-layout {
   display: flex;
@@ -737,18 +738,18 @@ onMounted(load)
   width: 300px;
   flex-shrink: 0;
   overflow-y: auto;
-  border-right: 1px solid #ebeef5;
+  border-right: 1px solid var(--line);
   padding-right: 12px;
 }
 .export-preview {
   flex: 1;
   overflow: auto;
-  background: #f5f7fa;
+  background: var(--paper-deep);
   padding: 12px;
   border-radius: 6px;
 }
 .paper {
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 14px rgba(90, 76, 55, 0.16);
   border-radius: 2px;
   min-height: 100%;
 }
@@ -761,7 +762,7 @@ onMounted(load)
 }
 .export-tip {
   font-size: 12px;
-  color: #909399;
+  color: var(--ink-soft);
   line-height: 1.5;
 }
 .export-actions {

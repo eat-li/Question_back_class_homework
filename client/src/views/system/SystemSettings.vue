@@ -5,7 +5,7 @@
         <div class="block-title">AI 智能排版</div>
       </template>
       <p class="desc">
-        在这里配置一次大模型的 API Key，之后编辑题目时点编辑器工具栏的 ✨ 按钮即可一键排版，无需每次填写。
+        在这里配置一次大模型的 API Key，之后编辑题目时点编辑器工具栏的「智能排版」按钮即可一键排版，无需每次填写。
         支持 OpenAI / DeepSeek / 通义千问 / Kimi 等任意 OpenAI 兼容接口。
       </p>
       <el-form label-width="100px" style="max-width: 560px">
@@ -31,8 +31,8 @@
           <el-input v-model="form.model" placeholder="如 gpt-4o-mini / deepseek-chat" />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="save">保存配置</el-button>
-          <el-button @click="reset">清空</el-button>
+          <el-button type="primary" :icon="Check" @click="save">保存配置</el-button>
+          <el-button :icon="Delete" @click="reset">清空</el-button>
         </el-form-item>
       </el-form>
       <p class="hint">配置仅保存在本机浏览器（localStorage），不会上传到服务器。</p>
@@ -42,6 +42,7 @@
 
 <script setup lang="ts">
 import { reactive, onMounted } from 'vue'
+import { Check, Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { loadAiConfig, saveAiConfig, clearAiConfig } from '../../utils/aiConfig'
 

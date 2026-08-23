@@ -141,7 +141,7 @@ const remove = (i: number) => {
   height: 18px;
   border: none;
   background: transparent;
-  color: #c9c0b2;
+  color: #b6bfba;
   cursor: pointer;
   font-size: 15px;
   line-height: 1;
