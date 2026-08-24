@@ -89,7 +89,7 @@ import { useRouter } from 'vue-router'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
-import { Mathematics } from '@tiptap/extension-mathematics'
+import { Mathematics } from './math-extension'
 import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
 import { uploadImage } from '../api/upload'
 import { formatQuestion } from '../api/ai'
@@ -406,6 +406,12 @@ onBeforeUnmount(() => {
 }
 .re-content :deep(.ProseMirror p) {
   margin: 0 0 4px;
+}
+/* 块级公式（$$...$$）单独成行 */
+.re-content :deep(.Tiptap-mathematics-render--display) {
+  display: block;
+  margin: 6px 0;
+  overflow-x: auto;
 }
 .re-hidden {
   display: none;

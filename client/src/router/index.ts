@@ -40,6 +40,24 @@ const router = createRouter({
           meta: { title: '题目浏览' }
         },
         {
+          path: 'conclusions',
+          name: 'conclusions',
+          component: () => import('../views/conclusion/ConclusionList.vue'),
+          meta: { title: '结论' }
+        },
+        {
+          path: 'conclusions/categories',
+          name: 'conclusionCategories',
+          component: () => import('../views/conclusion/CategoryManage.vue'),
+          meta: { title: '分类管理' }
+        },
+        {
+          path: 'conclusions/edit/:id?',
+          name: 'conclusionEdit',
+          component: () => import('../views/conclusion/ConclusionEdit.vue'),
+          meta: { title: '结论编辑' }
+        },
+        {
           path: 'homeworks',
           name: 'homeworks',
           component: () => import('../views/homework/HomeworkList.vue'),
@@ -50,6 +68,18 @@ const router = createRouter({
           name: 'homeworkView',
           component: () => import('../views/homework/HomeworkView.vue'),
           meta: { title: '查看作业' }
+        },
+        {
+          path: 'grades',
+          name: 'grades',
+          component: () => import('../views/grade/GradeInput.vue'),
+          meta: { title: '成绩录入' }
+        },
+        {
+          path: 'grade-analysis',
+          name: 'gradeAnalysis',
+          component: () => import('../views/grade/GradeAnalysis.vue'),
+          meta: { title: '成绩分析' }
         },
         {
           path: 'backup',

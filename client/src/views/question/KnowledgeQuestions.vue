@@ -61,8 +61,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getQuestions, deleteQuestion } from '../../api/question'
 import QuestionFormDialog from '../../components/QuestionFormDialog.vue'
-import renderMathInElement from 'katex/contrib/auto-render'
-import katexCss from 'katex/dist/katex.min.css?raw'
+import { printHtml } from '../../utils/printHtml'
 
 const route = useRoute()
 const router = useRouter()
@@ -151,17 +150,6 @@ const buildQuestionsHtml = (questions: any[], withAnswer: boolean) => {
   </div>`
 }
 
-// 渲染 $...$ 公式为 KaTeX HTML
-const renderMathHtml = (html: string): string => {
-  const div = document.createElement('div')
-  div.innerHTML = html
-  renderMathInElement(div, {
-    delimiters: [{ left: '$', right: '$', display: false }],
-    throwOnError: false
-  })
-  return div.innerHTML
-}
-
 // 导出该知识点全部题目为 PDF（打印方式）
 const doExport = async () => {
   const all = await getQuestions({ knowledgeTag: tag.value })
@@ -169,20 +157,8 @@ const doExport = async () => {
     ElMessage.warning('该知识点下没有题目')
     return
   }
-  const rendered = renderMathHtml(buildQuestionsHtml(all, showAnswer.value))
-  const win = window.open('', '_blank', 'width=900,height=700')
-  if (!win) {
-    ElMessage.warning('浏览器拦截了弹出窗口，请允许本站弹窗后再试')
-    return
-  }
-  win.document.write(
-    `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(
-      `${tagLabel.value} · 题目集`
-    )}</title><style>${katexCss}</style></head><body>${rendered}</body></html>`
-  )
-  win.document.close()
-  win.focus()
-  setTimeout(() => win.print(), 300)
+  const okFlag = printHtml(`${tagLabel.value} · 题目集`, buildQuestionsHtml(all, showAnswer.value))
+  if (!okFlag) ElMessage.warning('浏览器拦截了弹出窗口，请允许本站弹窗后再试')
 }
 
 const load = async () => {

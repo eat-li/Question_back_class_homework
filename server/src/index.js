@@ -2,12 +2,14 @@
 require('dotenv').config()
 const app = require('./app')
 const { sequelize } = require('./models')
+const { ensureIndexes } = require('./utils/ensureIndexes')
 
 const PORT = process.env.PORT || 3000
 
 sequelize
   .authenticate()
   .then(() => sequelize.sync({ alter: true })) // 开发期自动同步建表/补列
+  .then(() => ensureIndexes(sequelize)) // 同步后补建性能索引（不阻塞启动）
   .then(() => {
     app.listen(PORT, () => console.log(`✅ 服务已启动: http://localhost:${PORT}`))
   })

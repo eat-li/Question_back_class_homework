@@ -13,8 +13,12 @@ const root = ref<HTMLElement>()
 const renderMath = () => {
   if (!root.value) return
   renderMathInElement(root.value, {
-    delimiters: [{ left: '$', right: '$', display: false }],
-    throwOnError: false
+    delimiters: [
+      { left: '$$', right: '$$', display: true },
+      { left: '$', right: '$', display: false }
+    ],
+    throwOnError: false,
+    strict: false
   })
 }
 

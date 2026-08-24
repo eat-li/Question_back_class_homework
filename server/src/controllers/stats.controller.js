@@ -2,9 +2,17 @@
 const { Op } = require('sequelize')
 const { Question, Student, Homework, Submission } = require('../models')
 const { ok } = require('../utils/response')
+const { cacheGet, cacheSet } = require('../utils/cache')
+
+// 统计接口聚合多张表，结果变化不频繁，加短 TTL 缓存降低数据库压力
+const STATS_TTL = 10000
 
 exports.overview = async (req, res, next) => {
   try {
+    const cacheKey = 'stats:overview'
+    const cached = cacheGet(cacheKey)
+    if (cached) return ok(res, cached)
+
     const [questionCount, studentCount, homeworkCount, submissionCount] = await Promise.all([
       Question.count(),
       Student.count(),
@@ -36,12 +44,14 @@ exports.overview = async (req, res, next) => {
       raw: true
     })
 
-    ok(res, {
+    const payload = {
       counts: { questionCount, studentCount, homeworkCount, submissionCount },
       byType,
       byDifficulty,
       byKnowledge
-    })
+    }
+    cacheSet(cacheKey, payload, STATS_TTL)
+    ok(res, payload)
   } catch (e) {
     next(e)
   }

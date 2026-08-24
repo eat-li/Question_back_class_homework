@@ -8,5 +8,8 @@ router.use('/upload', require('./upload.routes'))
 router.use('/backup', require('./backup.routes'))
 router.use('/stats', require('./stats.routes'))
 router.use('/ai', require('./ai.routes'))
+router.use('/grades', require('./grade.routes'))
+router.use('/categories', require('./category.routes'))
+router.use('/conclusions', require('./conclusion.routes'))
 
 module.exports = router

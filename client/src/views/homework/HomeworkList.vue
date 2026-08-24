@@ -267,8 +267,8 @@ import {
 import { getQuestions } from '../../api/question'
 import { getStudents } from '../../api/student'
 import renderMathInElement from 'katex/contrib/auto-render'
-import katexCss from 'katex/dist/katex.min.css?raw'
 import RichContent from '../../components/RichContent.vue'
+import { printHtml } from '../../utils/printHtml'
 
 const list = ref([])
 const questions = ref([])
@@ -569,8 +569,12 @@ const previewRef = ref<HTMLElement>()
 const renderPreviewMath = () => {
   if (previewRef.value) {
     renderMathInElement(previewRef.value, {
-      delimiters: [{ left: '$', right: '$', display: false }],
-      throwOnError: false
+      delimiters: [
+        { left: '$$', right: '$$', display: true },
+        { left: '$', right: '$', display: false }
+      ],
+      throwOnError: false,
+      strict: false
     })
   }
 }
@@ -580,17 +584,6 @@ watch(previewHtml, async () => {
   await nextTick()
   renderPreviewMath()
 }, { immediate: true })
-
-// 把 HTML 中的 $...$ 公式渲染成 KaTeX HTML（导出用）
-const renderMathHtml = (html: string): string => {
-  const div = document.createElement('div')
-  div.innerHTML = html
-  renderMathInElement(div, {
-    delimiters: [{ left: '$', right: '$', display: false }],
-    throwOnError: false
-  })
-  return div.innerHTML
-}
 
 // 打开导出预览
 const openExport = async (row: any) => {
@@ -618,20 +611,8 @@ const doExport = () => {
     ElMessage.warning('该作业没有题目')
     return
   }
-  const rendered = renderMathHtml(buildHomeworkHtml())
-  const win = window.open('', '_blank', 'width=900,height=700')
-  if (!win) {
-    ElMessage.warning('浏览器拦截了弹出窗口，请允许本站弹窗后再试')
-    return
-  }
-  win.document.write(
-    `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(
-      exportHomework.value?.title || '作业'
-    )}</title><style>${katexCss}</style></head><body>${rendered}</body></html>`
-  )
-  win.document.close()
-  win.focus()
-  setTimeout(() => win.print(), 300)
+  const okFlag = printHtml(exportHomework.value?.title || '作业', buildHomeworkHtml())
+  if (!okFlag) ElMessage.warning('浏览器拦截了弹出窗口，请允许本站弹窗后再试')
 }
 
 const save = async () => {

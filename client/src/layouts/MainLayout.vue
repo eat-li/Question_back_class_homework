@@ -15,8 +15,11 @@
         <el-menu-item index="/students"><el-icon><User /></el-icon><span>学生管理</span></el-menu-item>
         <el-menu-item index="/questions"><el-icon><Collection /></el-icon><span>题库管理</span></el-menu-item>
         <el-menu-item index="/browse"><el-icon><Reading /></el-icon><span>题目浏览</span></el-menu-item>
+        <el-menu-item index="/conclusions"><el-icon><Memo /></el-icon><span>结论</span></el-menu-item>
         <el-menu-item index="/homeworks"><el-icon><Document /></el-icon><span>作业管理</span></el-menu-item>
         <el-menu-item index="/homework-view"><el-icon><View /></el-icon><span>查看作业</span></el-menu-item>
+        <el-menu-item index="/grades"><el-icon><DocumentAdd /></el-icon><span>成绩录入</span></el-menu-item>
+        <el-menu-item index="/grade-analysis"><el-icon><TrendCharts /></el-icon><span>成绩分析</span></el-menu-item>
         <el-menu-item index="/backup"><el-icon><FolderOpened /></el-icon><span>数据备份</span></el-menu-item>
         <el-menu-item index="/settings"><el-icon><Setting /></el-icon><span>系统设置</span></el-menu-item>
       </el-menu>
@@ -53,7 +56,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { House, User, Collection, Reading, Document, View, FolderOpened, Setting } from '@element-plus/icons-vue'
+import { House, User, Collection, Reading, Document, View, DocumentAdd, TrendCharts, FolderOpened, Setting, Memo } from '@element-plus/icons-vue'
 import QuickLinks from '../components/QuickLinks.vue'
 
 const today = ref(

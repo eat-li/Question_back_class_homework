@@ -2,6 +2,10 @@
 const { Op } = require('sequelize')
 const { Question } = require('../models')
 const { ok, fail } = require('../utils/response')
+const { cacheGet, cacheSet } = require('../utils/cache')
+
+// 知识点标签变化不频繁，加短 TTL 缓存
+const TAGS_TTL = 10000
 
 // 列表（关键词/题型/难度/知识点检索）
 exports.list = async (req, res, next) => {
@@ -27,13 +31,19 @@ exports.list = async (req, res, next) => {
 // 知识点标签列表（去重，供筛选下拉使用）
 exports.tags = async (req, res, next) => {
   try {
+    const cacheKey = 'questions:tags'
+    const cached = cacheGet(cacheKey)
+    if (cached) return ok(res, cached)
+
     const rows = await Question.findAll({
       attributes: ['knowledgeTag'],
       where: { knowledgeTag: { [Op.ne]: null, [Op.ne]: '' } },
       group: ['knowledgeTag'],
       order: [['knowledgeTag', 'ASC']]
     })
-    ok(res, rows.map((r) => r.knowledgeTag).filter(Boolean))
+    const tags = rows.map((r) => r.knowledgeTag).filter(Boolean)
+    cacheSet(cacheKey, tags, TAGS_TTL)
+    ok(res, tags)
   } catch (e) {
     next(e)
   }

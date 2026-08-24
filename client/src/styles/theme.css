@@ -109,6 +109,22 @@ body {
   transition: box-shadow 0.2s ease;
 }
 
+/* KaTeX 公式：默认 nowrap 会让超长公式横向溢出，这里放开换行，块级公式再加横向滚动兜底 */
+.katex {
+  white-space: normal;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+.katex-display > .katex {
+  white-space: normal;
+}
+.katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.4em 0;
+}
+
 /* 滚动条 */
 ::-webkit-scrollbar {
   width: 10px;
