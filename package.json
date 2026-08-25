@@ -2,6 +2,7 @@
   "name": "teacher-assistant",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.3.0",
   "scripts": {
     "dev": "pnpm --parallel --filter \"./client\" --filter \"./server\" dev",
     "dev:client": "pnpm --filter \"./client\" dev",
