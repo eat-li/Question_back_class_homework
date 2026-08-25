@@ -20,12 +20,18 @@ importers:
       '@element-plus/icons-vue':
         specifier: ^2.3.2
         version: 2.3.2(vue@3.5.41(typescript@5.6.3))
+      '@tiptap/core':
+        specifier: 2.27.2
+        version: 2.27.2(@tiptap/pm@2.27.2)
       '@tiptap/extension-image':
         specifier: 2.27.2
         version: 2.27.2(@tiptap/core@2.27.2(@tiptap/pm@2.27.2))
       '@tiptap/extension-mathematics':
         specifier: 2.27.2
         version: 2.27.2(@tiptap/core@2.27.2(@tiptap/pm@2.27.2))(@tiptap/pm@2.27.2)(katex@0.18.4)
+      '@tiptap/pm':
+        specifier: 2.27.2
+        version: 2.27.2
       '@tiptap/starter-kit':
         specifier: 2.27.2
         version: 2.27.2
