@@ -20,6 +20,16 @@
             placeholder="选择分类"
             style="width: 100%"
           />
+          <div class="cat-tip">
+            <template v-if="!cascaderOptions.length">
+              还没有知识点分类，请先
+              <el-button link type="primary" @click="goCategories">去创建分类</el-button>
+            </template>
+            <template v-else>
+              找不到合适的分类？
+              <el-button link type="primary" @click="goCategories">管理分类</el-button>
+            </template>
+          </div>
         </el-form-item>
         <el-form-item label="详细内容" required>
           <RichEditor v-model="form.content" />
@@ -160,6 +170,7 @@ const save = async (status: 'draft' | 'published') => {
 }
 
 const goBack = () => router.push('/conclusions')
+const goCategories = () => router.push('/conclusions/categories')
 
 onMounted(load)
 </script>
@@ -191,6 +202,12 @@ onMounted(load)
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+.cat-tip {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  margin-top: 4px;
 }
 .preview-summary {
   color: var(--moss-deep);

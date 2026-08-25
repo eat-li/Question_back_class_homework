@@ -3,15 +3,18 @@
     <div class="toolbar">
       <el-button type="primary" :icon="Plus" @click="openDialog()">新增成绩</el-button>
       <el-button type="primary" plain :icon="Upload" @click="openBatch">批量录入</el-button>
+      <div class="toolbar-spacer"></div>
+      <span class="hint">点击学生卡片查看其全部成绩</span>
     </div>
 
     <div class="filter-bar">
       <el-input
         v-model="fName"
-        placeholder="学生姓名"
+        placeholder="搜索学生姓名"
         clearable
-        style="width: 160px"
-        @keyup.enter="load"
+        style="width: 180px"
+        @input="onNameInput"
+        @clear="onNameInput"
       >
         <template #prefix><el-icon><Search /></el-icon></template>
       </el-input>
@@ -25,48 +28,91 @@
         placeholder="考试日期"
         style="width: 170px"
       />
-      <el-button type="primary" :icon="Search" @click="load">查询</el-button>
+      <el-button type="primary" :icon="Search" @click="reloadGrades">查询</el-button>
       <el-button :icon="RefreshRight" @click="reset">重置</el-button>
     </div>
 
-    <el-table :data="list" border stripe v-loading="loading">
-      <el-table-column label="学生" width="120">
-        <template #default="{ row }">{{ row.student?.name || '—' }}</template>
-      </el-table-column>
-      <el-table-column label="年级" width="110">
-        <template #default="{ row }">{{ row.student?.grade || '—' }}</template>
-      </el-table-column>
-      <el-table-column label="科目" width="90">
-        <template #default="{ row }">{{ row.subject }}</template>
-      </el-table-column>
-      <el-table-column label="考试类型" width="110">
-        <template #default="{ row }">
-          <el-tag :type="examTypeTag(row.examType)" size="small">{{ examTypeLabel(row.examType) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="考试日期" width="120">
-        <template #default="{ row }">{{ row.examDate || '—' }}</template>
-      </el-table-column>
-      <el-table-column label="得分" width="140">
-        <template #default="{ row }">
-          <span class="score">{{ row.score }}</span>
-          <span class="score-full">/ {{ row.fullScore }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="百分比" width="90">
-        <template #default="{ row }">
-          <span :class="percentClass(row)">{{ percent(row) }}%</span>
-        </template>
-      </el-table-column>
-      <el-table-column prop="comment" label="备注" min-width="140" show-overflow-tooltip />
-      <el-table-column label="操作" width="140" fixed="right">
-        <template #default="{ row }">
-          <el-button size="small" :icon="Edit" @click="openDialog(row)">编辑</el-button>
-          <el-button size="small" type="danger" :icon="Delete" @click="remove(row)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-    <el-empty v-if="!loading && !list.length" :description="queried ? '没有符合条件的成绩记录' : '请设置筛选条件后点击「查询」'" />
+    <!-- 学生卡片：默认全量展示，按姓名实时过滤 -->
+    <div class="cards" v-loading="loading">
+      <div
+        v-for="c in cards"
+        :key="c.id"
+        class="stu-card"
+        :class="{ 'stu-card--empty': c.examCount === 0 }"
+        @click="openDrawer(c)"
+      >
+        <div class="stu-card__head">
+          <span class="stu-name">{{ c.name }}</span>
+          <span v-if="c.grade" class="stu-grade">{{ c.grade }}</span>
+        </div>
+        <div class="stu-card__body">
+          <div class="metric">
+            <span class="metric__num">{{ c.examCount }}</span>
+            <span class="metric__label">场考试</span>
+          </div>
+          <div v-if="c.latest" class="latest">
+            <div class="latest__line">
+              <el-tag :type="examTypeTag(c.latest.examType)" size="small">
+                {{ examTypeLabel(c.latest.examType) }}
+              </el-tag>
+              <span class="latest__date">{{ c.latest.examDate }}</span>
+            </div>
+            <div class="latest__score" :class="pctClass(c.latest)">
+              {{ c.latest.score }}<small>/{{ c.latest.fullScore }}</small>
+              <span class="latest__pct">{{ percent(c.latest) }}%</span>
+            </div>
+          </div>
+          <div v-else class="latest latest--none">暂无成绩记录</div>
+        </div>
+        <div class="stu-card__foot">查看全部成绩 →</div>
+      </div>
+
+      <el-empty
+        v-if="!loading && !cards.length"
+        :description="fName ? '没有匹配的学生' : '还没有学生，请先在「学生管理」中添加'"
+      />
+    </div>
+
+    <!-- 学生成绩详情抽屉 -->
+    <el-drawer v-model="drawerVisible" :title="`${currentStudent?.name || ''} 的成绩`" size="580px">
+      <div v-if="fExamType || fExamDate" class="drawer-filter">
+        已按条件过滤：
+        <el-tag v-if="fExamType" size="small" style="margin-right: 6px">{{ examTypeLabel(fExamType) }}</el-tag>
+        <el-tag v-if="fExamDate" size="small">{{ fExamDate }}</el-tag>
+      </div>
+
+      <div class="drawer-actions">
+        <el-button type="primary" :icon="Plus" size="small" @click="openDialog(null, currentStudent)">
+          为该生新增成绩
+        </el-button>
+      </div>
+
+      <el-table :data="currentGrades" border stripe max-height="60vh">
+        <el-table-column label="日期" prop="examDate" width="120" />
+        <el-table-column label="类型" width="100">
+          <template #default="{ row }">
+            <el-tag :type="examTypeTag(row.examType)" size="small">{{ examTypeLabel(row.examType) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="得分" width="120">
+          <template #default="{ row }">
+            <span class="score">{{ row.score }}</span>
+            <span class="score-full">/ {{ row.fullScore }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="百分比" width="90">
+          <template #default="{ row }"><span :class="pctClass(row)">{{ percent(row) }}%</span></template>
+        </el-table-column>
+        <el-table-column prop="comment" label="备注" min-width="120" show-overflow-tooltip />
+        <el-table-column label="操作" width="120" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" :icon="Edit" @click="openDialog(row)">编辑</el-button>
+            <el-button size="small" type="danger" :icon="Delete" @click="remove(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-if="!currentGrades.length" description="该生暂无符合条件的成绩" />
+    </el-drawer>
 
     <!-- 新增 / 编辑 -->
     <el-dialog v-model="dialogVisible" :title="form.id ? '编辑成绩' : '新增成绩'" width="460px">
@@ -159,65 +205,95 @@ const examTypeLabel = (t: string) => examTypes.find((x) => x.value === t)?.label
 const examTypeTag = (t: string): 'success' | 'warning' | 'primary' | 'info' | 'danger' =>
   (({ final: 'success', mid: 'primary', quiz: 'warning', popquiz: 'info' } as Record<string, any>)[t]) || 'info'
 
+// 所有学生（用于卡片与下拉）
 const students = ref<any[]>([])
-const list = ref<any[]>([])
+// 成绩数据（受考试类型 / 日期筛选影响，点击查询时刷新）
+const grades = ref<any[]>([])
 const loading = ref(false)
-const queried = ref(false)
+
+// 筛选条件
 const fName = ref('')
 const fExamType = ref('')
 const fExamDate = ref('')
 
-const dialogVisible = ref(false)
-const form = reactive<any>({ examType: 'quiz', subject: '数学', fullScore: 100 })
+// 按学生分组（成绩已按日期降序，便于取“最近一次”）
+const gradesByStudent = computed(() => {
+  const m = new Map<number, any[]>()
+  for (const g of grades.value) {
+    if (!m.has(g.studentId)) m.set(g.studentId, [])
+    m.get(g.studentId)!.push(g)
+  }
+  for (const arr of m.values()) {
+    arr.sort((a, b) => (b.examDate || '').localeCompare(a.examDate || '') || b.id - a.id)
+  }
+  return m
+})
 
-const batchVisible = ref(false)
-const batchForm = reactive<any>({ examType: 'quiz', subject: '数学', fullScore: 100, examDate: '' })
-const batchStudentIds = ref<number[]>([])
-const batchScores = reactive<Record<number, number | undefined>>({})
+// 学生卡片：默认展示全部，姓名做实时模糊过滤
+const cards = computed(() =>
+  students.value
+    .filter((s) => !fName.value.trim() || s.name.toLowerCase().includes(fName.value.trim().toLowerCase()))
+    .map((s) => {
+      const gs = gradesByStudent.value.get(s.id) || []
+      return { ...s, examCount: gs.length, latest: gs[0] || null }
+    })
+)
 
-const selectedStudents = computed(() => students.value.filter((s) => batchStudentIds.value.includes(s.id)))
+// 抽屉
+const drawerVisible = ref(false)
+const currentStudent = ref<any>(null)
+const currentGrades = computed(() =>
+  currentStudent.value ? gradesByStudent.value.get(currentStudent.value.id) || [] : []
+)
 
 const percent = (row: any) => (row.fullScore > 0 ? Math.round((row.score / row.fullScore) * 100) : 0)
-const percentClass = (row: any) => {
+const pctClass = (row: any) => {
   const p = percent(row)
   if (p >= 90) return 'pct pct--good'
   if (p >= 60) return 'pct pct--mid'
   return 'pct pct--bad'
 }
 
-const load = async () => {
-  if (!fName.value.trim() && !fExamType.value && !fExamDate.value) {
-    ElMessage.warning('请至少设置一项筛选条件（姓名 / 考试类型 / 日期）')
-    return
-  }
+const loadStudents = async () => {
+  students.value = await getStudents()
+}
+
+// 拉取成绩（考试类型 / 日期为可选筛选条件）
+const reloadGrades = async () => {
   loading.value = true
   try {
-    list.value = await getGrades({
-      studentName: fName.value.trim() || undefined,
+    grades.value = await getGrades({
       examType: fExamType.value || undefined,
       examDate: fExamDate.value || undefined
     })
-    queried.value = true
   } finally {
     loading.value = false
   }
+}
+
+const onNameInput = () => {
+  // 姓名仅过滤卡片，无需重新请求
 }
 
 const reset = () => {
   fName.value = ''
   fExamType.value = ''
   fExamDate.value = ''
-  list.value = []
-  queried.value = false
+  reloadGrades()
 }
 
-const loadStudents = async () => {
-  students.value = await getStudents()
+const openDrawer = (c: any) => {
+  currentStudent.value = c
+  drawerVisible.value = true
 }
 
-const openDialog = (row?: any) => {
+// 新增 / 编辑
+const dialogVisible = ref(false)
+const form = reactive<any>({ examType: 'quiz', subject: '数学', fullScore: 100 })
+
+const openDialog = (row?: any, student?: any) => {
   Object.keys(form).forEach((k) => delete form[k])
-  if (row) {
+  if (row && row.id) {
     Object.assign(form, {
       id: row.id,
       studentId: row.studentId,
@@ -228,6 +304,13 @@ const openDialog = (row?: any) => {
       fullScore: row.fullScore,
       comment: row.comment
     })
+  } else if (student) {
+    form.examType = 'quiz'
+    form.subject = '数学'
+    form.fullScore = 100
+    form.score = undefined
+    form.examDate = ''
+    form.studentId = student.id
   } else {
     form.examType = 'quiz'
     form.subject = '数学'
@@ -253,8 +336,16 @@ const save = async () => {
     ElMessage.success('保存成功')
   }
   dialogVisible.value = false
-  load()
+  reloadGrades()
 }
+
+// 批量录入
+const batchVisible = ref(false)
+const batchForm = reactive<any>({ examType: 'quiz', subject: '数学', fullScore: 100, examDate: '' })
+const batchStudentIds = ref<number[]>([])
+const batchScores = reactive<Record<number, number | undefined>>({})
+
+const selectedStudents = computed(() => students.value.filter((s) => batchStudentIds.value.includes(s.id)))
 
 const openBatch = () => {
   batchForm.examType = 'quiz'
@@ -284,7 +375,7 @@ const submitBatch = async () => {
   await importGrades(payload)
   ElMessage.success(`批量录入完成：${rows.length} 名学生`)
   batchVisible.value = false
-  load()
+  reloadGrades()
 }
 
 const remove = async (row: any) => {
@@ -295,11 +386,12 @@ const remove = async (row: any) => {
   )
   await deleteGrade(row.id)
   ElMessage.success('删除成功')
-  load()
+  reloadGrades()
 }
 
 onMounted(() => {
   loadStudents()
+  reloadGrades()
 })
 </script>
 
@@ -310,6 +402,13 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
 }
+.toolbar-spacer {
+  flex: 1;
+}
+.hint {
+  color: var(--ink-soft);
+  font-size: 13px;
+}
 .filter-bar {
   margin-bottom: 16px;
   display: flex;
@@ -317,6 +416,121 @@ onMounted(() => {
   gap: 8px;
   flex-wrap: wrap;
 }
+
+/* 学生卡片网格 */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+  min-height: 120px;
+}
+.stu-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  padding: 14px 16px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+.stu-card:hover {
+  border-color: var(--moss);
+  box-shadow: 0 4px 14px rgba(74, 101, 68, 0.12);
+  transform: translateY(-2px);
+}
+.stu-card--empty {
+  opacity: 0.85;
+}
+.stu-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.stu-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.stu-grade {
+  font-size: 12px;
+  color: var(--ink-soft);
+  background: var(--moss-soft);
+  border-radius: 4px;
+  padding: 1px 8px;
+}
+.stu-card__body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 56px;
+}
+.metric__num {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--moss-deep);
+  line-height: 1.1;
+}
+.metric__label {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+.latest {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.latest__line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.latest__date {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.latest__score {
+  font-size: 15px;
+  font-weight: 600;
+}
+.latest__score small {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ink-soft);
+  margin: 0 4px 0 2px;
+}
+.latest__pct {
+  font-size: 12px;
+  margin-left: 4px;
+}
+.latest--none {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.stu-card__foot {
+  font-size: 12px;
+  color: var(--moss);
+  text-align: right;
+}
+
+/* 抽屉内 */
+.drawer-filter {
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.drawer-actions {
+  margin-bottom: 12px;
+}
+
 .score {
   font-weight: 600;
   color: var(--ink);

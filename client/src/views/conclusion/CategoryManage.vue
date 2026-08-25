@@ -14,10 +14,10 @@
               <span class="cat-tree__title">知识点分类</span>
               <span class="cat-tree__count">{{ totalCount }} 个</span>
             </div>
-            <el-button type="primary" :icon="Plus" @click="openCreate()">新建一级分类</el-button>
+            <el-button type="primary" :icon="Plus" @click="openCreate()">新建分类</el-button>
           </div>
 
-          <p class="cat-tree__hint">点选分类即可在右侧编辑；悬停分类可新建子分类或删除。</p>
+          <p class="cat-tree__hint">点选左侧分类即可在右侧编辑；新建时在右侧选择「上级分类」决定层级。</p>
 
           <div class="cat-tree__body">
             <el-tree
@@ -37,7 +37,7 @@
                   <span class="tree-node__label">{{ data.name }}</span>
                   <span v-if="isChild(data)" class="tree-node__level">二级</span>
                   <span class="tree-node__actions">
-                    <el-tooltip content="新建子分类" placement="top" :show-after="400">
+                    <el-tooltip v-if="!isChild(data)" content="新建子分类" placement="top" :show-after="400">
                       <el-icon class="tree-node__icon" @click.stop="openCreate(data.id)"><Plus /></el-icon>
                     </el-tooltip>
                     <el-tooltip content="删除" placement="top" :show-after="400">
@@ -64,9 +64,21 @@
             <span v-if="parentName" class="cat-form__parent">所属：{{ parentName }}</span>
           </div>
 
-          <el-form :model="form" label-width="64px">
+          <el-form :model="form" label-width="80px">
             <el-form-item label="名称">
               <el-input v-model="form.name" placeholder="如：代数 / 几何 / 函数" maxlength="50" />
+            </el-form-item>
+            <el-form-item label="上级分类">
+              <el-select v-model="form.parentId" placeholder="无（作为一级分类）" clearable style="width: 100%">
+                <el-option
+                  v-for="c in topLevelCategories"
+                  :key="c.id"
+                  :label="c.name"
+                  :value="c.id"
+                  :disabled="c.id === form.id"
+                />
+              </el-select>
+              <div class="cat-form__tip">留空即为一级分类；选择某个一级分类后，本分类将成为其子分类（二级）。</div>
             </el-form-item>
             <el-form-item label="排序">
               <el-input-number v-model="form.sort" :min="0" :max="9999" />
@@ -107,10 +119,14 @@ const isChild = (data: any) => data.parentId != null
 const countNodes = (nodes: any[]): number =>
   nodes.reduce((sum, n) => sum + 1 + countNodes(n.children || []), 0)
 
+// 「上级分类」下拉的候选：仅允许二级嵌套，故父级只能是一级分类
+const topLevelCategories = computed(() => tree.value.filter((n) => n.parentId == null))
+
 // 当前表单对应的父分类名（新建/编辑子分类时提示所属）
 const parentName = computed(() => {
-  if (form.parentId == null) return ''
-  const found = findNode(tree.value, form.parentId)
+  const pid = form.parentId === '' || form.parentId == null ? null : form.parentId
+  if (pid == null) return ''
+  const found = findNode(tree.value, pid)
   return found ? found.name : ''
 })
 
@@ -160,7 +176,7 @@ const save = async () => {
   }
   const payload = {
     name: form.name.trim(),
-    parentId: form.parentId,
+    parentId: form.parentId === '' || form.parentId == null ? null : Number(form.parentId),
     sort: form.sort,
     remark: form.remark || null
   }
@@ -418,6 +434,12 @@ onMounted(load)
 .cat-form__parent {
   font-size: 13px;
   color: var(--ink-soft);
+}
+.cat-form__tip {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  margin-top: 4px;
 }
 .cat-form__actions {
   display: flex;

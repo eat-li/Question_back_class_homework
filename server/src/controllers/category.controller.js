@@ -16,12 +16,13 @@ const pick = (body) => {
 exports.list = async (req, res, next) => {
   try {
     const rows = await KnowledgeCategory.findAll({ order: [['sort', 'ASC'], ['id', 'ASC']] })
-    // 构建 id -> 分类 索引，再拼装父子结构
-    const nodes = rows.map((r) => r.toJSON())
+    // 先为每个节点初始化 children 数组，再按父子关系挂载。
+    // 否则当子节点的 sort 排到父节点之前时，父节点的 children 尚未初始化，会抛
+    // 「Cannot read properties of undefined (reading 'push')」，导致分类列表整体 500。
+    const nodes = rows.map((r) => ({ ...r.toJSON(), children: [] }))
     const roots = []
     const byId = new Map(nodes.map((n) => [n.id, n]))
     for (const n of nodes) {
-      n.children = []
       if (n.parentId && byId.has(n.parentId)) {
         byId.get(n.parentId).children.push(n)
       } else {
