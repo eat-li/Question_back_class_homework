@@ -29,14 +29,20 @@ exports.overview = async (req, res, next) => {
 
     // 难度分布
     const byDifficulty = await Question.findAll({
-      attributes: ['difficulty', [Question.sequelize.fn('COUNT', Question.sequelize.col('id')), 'count']],
+      attributes: [
+        'difficulty',
+        [Question.sequelize.fn('COUNT', Question.sequelize.col('id')), 'count']
+      ],
       group: ['difficulty'],
       raw: true
     })
 
     // 知识点分布（按数量取前 10）
     const byKnowledge = await Question.findAll({
-      attributes: ['knowledgeTag', [Question.sequelize.fn('COUNT', Question.sequelize.col('id')), 'count']],
+      attributes: [
+        'knowledgeTag',
+        [Question.sequelize.fn('COUNT', Question.sequelize.col('id')), 'count']
+      ],
       where: { knowledgeTag: { [Op.ne]: null, [Op.ne]: '' } },
       group: ['knowledgeTag'],
       order: [[Question.sequelize.fn('COUNT', Question.sequelize.col('id')), 'DESC']],

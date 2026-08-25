@@ -1,13 +1,15 @@
 <template>
-  <div ref="root" class="rich-content" v-html="html"></div>
+  <div ref="root" class="rich-content" v-html="safeHtml"></div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import renderMathInElement from 'katex/contrib/auto-render'
+import { sanitizeHtml } from '../utils/sanitizeHtml'
 
 const props = defineProps<{ html: string }>()
 const root = ref<HTMLElement>()
+const safeHtml = computed(() => sanitizeHtml(props.html || ''))
 
 // 用 KaTeX auto-render 把 $...$ 公式渲染成数学公式
 const renderMath = () => {

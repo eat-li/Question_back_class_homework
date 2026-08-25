@@ -3,17 +3,23 @@
     <div class="toolbar">
       <el-button link type="primary" :icon="ArrowLeft" @click="goBack">返回题库</el-button>
       <span class="title">{{ tagLabel }}</span>
-      <span class="count">共 {{ list.length }} 题</span>
+      <span class="count">共 {{ total }} 题</span>
     </div>
 
     <div class="filters">
-      <el-radio-group v-model="type" @change="load">
+      <el-radio-group v-model="type" @change="search">
         <el-radio-button value="all">全部</el-radio-button>
         <el-radio-button value="choice">选择题</el-radio-button>
         <el-radio-button value="fill">填空题</el-radio-button>
         <el-radio-button value="solve">解答题</el-radio-button>
       </el-radio-group>
-      <el-select v-model="difficulty" placeholder="难度" clearable style="width: 120px" @change="load">
+      <el-select
+        v-model="difficulty"
+        placeholder="难度"
+        clearable
+        style="width: 120px"
+        @change="search"
+      >
         <el-option v-for="n in 5" :key="n" :label="`${n} 星`" :value="n" />
       </el-select>
       <div class="filters__actions">
@@ -49,6 +55,17 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <div v-if="total > pageSize" class="pager">
+      <el-pagination
+        v-model:current-page="page"
+        :page-size="pageSize"
+        :total="total"
+        layout="prev, pager, next, total"
+        background
+        @current-change="load"
+      />
+    </div>
   </el-card>
 
   <QuestionFormDialog v-model="editVisible" :question="editing" @saved="load" />
@@ -61,7 +78,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getQuestions, deleteQuestion } from '../../api/question'
 import QuestionFormDialog from '../../components/QuestionFormDialog.vue'
+import type { Question } from '../../types'
 import { printHtml } from '../../utils/printHtml'
+import { questionTypeLabel as typeLabel, stripHtml, escapeHtml } from '../../utils/format'
 
 const route = useRoute()
 const router = useRouter()
@@ -70,44 +89,18 @@ const router = useRouter()
 const tag = computed(() => String(route.params.tag || ''))
 const tagLabel = computed(() => (tag.value === '__empty__' ? '未分类' : tag.value))
 
-const list = ref<any[]>([])
+const list = ref<Question[]>([])
 const loading = ref(false)
 const type = ref('all')
+const page = ref(1)
+const pageSize = 20
+const total = ref(0)
 const difficulty = ref<number>()
 const editVisible = ref(false)
 const editing = ref<any>(null)
 const showAnswer = ref(false)
 const showAnswerArea = ref(false)
 const answerAreaHeight = ref(100)
-
-const typeMap: Record<string, string> = {
-  choice: '选择题',
-  fill: '填空题',
-  solve: '解答题'
-}
-const typeLabel = (t: string) => typeMap[t] || t
-
-const stripHtml = (html: string) =>
-  (html || '')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-
-// HTML 转义（选项等纯文本字段）
-const escapeHtml = (s: any) =>
-  String(s ?? '').replace(/[&<>"']/g, (c) => {
-    const map: Record<string, string> = {
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;'
-    }
-    return map[c]
-  })
 
 // 生成知识点题目集 HTML（打印用）
 const buildQuestionsHtml = (questions: any[], withAnswer: boolean) => {
@@ -164,13 +157,20 @@ const doExport = async () => {
 const load = async () => {
   loading.value = true
   try {
-    const params: any = { knowledgeTag: tag.value }
+    const params: any = { knowledgeTag: tag.value, page: page.value, pageSize }
     if (type.value !== 'all') params.type = type.value
     if (difficulty.value != null) params.difficulty = difficulty.value
-    list.value = await getQuestions(params)
+    const res = await getQuestions(params)
+    list.value = res.list
+    total.value = res.total
   } finally {
     loading.value = false
   }
+}
+
+const search = () => {
+  page.value = 1
+  load()
 }
 
 const goBack = () => router.push('/questions')
@@ -225,5 +225,10 @@ onMounted(load)
   gap: 6px;
   color: #555;
   font-size: 13px;
+}
+.pager {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
 }
 </style>

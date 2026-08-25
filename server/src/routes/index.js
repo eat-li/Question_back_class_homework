@@ -1,5 +1,10 @@
 // 路由汇总挂载（新增模块在此追加一行）
 const router = require('express').Router()
+const { requireAuth } = require('../middlewares/auth')
+
+// 登录接口公开，其余业务接口都需要登录
+router.use('/auth', require('./auth.routes'))
+router.use(requireAuth)
 
 router.use('/students', require('./student.routes'))
 router.use('/questions', require('./question.routes'))

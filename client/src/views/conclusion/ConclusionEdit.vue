@@ -9,7 +9,12 @@
 
       <el-form :model="form" label-width="90px" class="edit-form">
         <el-form-item label="标题" required>
-          <el-input v-model="form.title" placeholder="结论标题，如：等腰三角形三线合一" maxlength="200" show-word-limit />
+          <el-input
+            v-model="form.title"
+            placeholder="结论标题，如：等腰三角形三线合一"
+            maxlength="200"
+            show-word-limit
+          />
         </el-form-item>
         <el-form-item label="所属分类" required>
           <el-cascader
@@ -45,7 +50,11 @@
           />
         </el-form-item>
         <el-form-item label="标签">
-          <el-input v-model="form.tags" placeholder="关键词，逗号分隔，如：三线合一,等腰三角形" maxlength="255" />
+          <el-input
+            v-model="form.tags"
+            placeholder="关键词，逗号分隔，如：三线合一,等腰三角形"
+            maxlength="255"
+          />
         </el-form-item>
       </el-form>
 
@@ -93,7 +102,13 @@ const form = reactive<any>({
 
 const categoryPath = ref<number[]>([])
 const cascaderOptions = ref<any[]>([])
-const cascaderProps = { value: 'id', label: 'name', children: 'children', checkStrictly: true, emitPath: true }
+const cascaderProps = {
+  value: 'id',
+  label: 'name',
+  children: 'children',
+  checkStrictly: true,
+  emitPath: true
+}
 const statusLabel = ref('')
 
 const previewVisible = ref(false)
@@ -142,12 +157,17 @@ const save = async (status: 'draft' | 'published') => {
     ElMessage.warning('请填写标题')
     return
   }
-  const categoryId = categoryPath.value.length ? categoryPath.value[categoryPath.value.length - 1] : null
+  const categoryId = categoryPath.value.length
+    ? categoryPath.value[categoryPath.value.length - 1]
+    : null
   if (categoryId == null) {
     ElMessage.warning('请选择所属分类')
     return
   }
-  const plain = (form.content || '').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim()
+  const plain = (form.content || '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .trim()
   if (!plain) {
     ElMessage.warning('请填写详细内容')
     return

@@ -6,11 +6,33 @@
         <div class="block-title">备份题目与作业</div>
       </template>
       <p class="desc">
-        把全部题目、作业、学生名单和成绩打包成一个压缩包下载。建议定期下载并存到 U 盘或网盘，电脑出问题时可以据此恢复。
+        把全部数据（学生、题目、作业、成绩、知识点分类、结论）打包成一个压缩包下载。建议定期下载并存到
+        U 盘或网盘，电脑出问题时可以据此恢复。
       </p>
       <el-button type="primary" :icon="Download" :loading="backupLoading" @click="downloadBackup">
         下载备份压缩包
       </el-button>
+    </el-card>
+
+    <!-- 整包恢复 -->
+    <el-card class="block">
+      <template #header>
+        <div class="block-title">恢复备份</div>
+      </template>
+      <p class="desc">
+        选择之前下载的备份 ZIP，系统会按依赖顺序恢复全部数据。注意：恢复会按主键 id
+        插入或更新已有记录，请确认当前数据可被覆盖。
+      </p>
+      <el-button type="warning" :icon="Upload" :loading="restoring" @click="triggerRestore">
+        选择备份 ZIP 并恢复
+      </el-button>
+      <input
+        ref="restoreInput"
+        type="file"
+        accept=".zip,application/zip"
+        hidden
+        @change="onRestoreFile"
+      />
     </el-card>
 
     <!-- 学生信息导出与导入 -->
@@ -19,11 +41,14 @@
         <div class="block-title">学生信息</div>
       </template>
       <p class="desc">
-        把学生名单导出为 JSON 文件；下次（或换电脑后）直接导入即可恢复。导入时按「姓名」判断，已存在的学生会被更新。
+        把学生名单导出为 JSON
+        文件；下次（或换电脑后）直接导入即可恢复。导入时按「姓名」判断，已存在的学生会被更新。
       </p>
       <div class="actions">
         <el-button :icon="Download" @click="downloadStudents">导出学生 JSON</el-button>
-        <el-button type="primary" :icon="Upload" :loading="importing" @click="triggerImport">导入学生 JSON</el-button>
+        <el-button type="primary" :icon="Upload" :loading="importing" @click="triggerImport"
+          >导入学生 JSON</el-button
+        >
         <input
           ref="fileInput"
           type="file"
@@ -41,10 +66,13 @@ import { ref } from 'vue'
 import { Download, Upload } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { importStudents } from '../../api/student'
+import { restoreBackup } from '../../api/backup'
 
 const backupLoading = ref(false)
 const importing = ref(false)
+const restoring = ref(false)
 const fileInput = ref<HTMLInputElement>()
+const restoreInput = ref<HTMLInputElement>()
 
 // 通过隐藏 a 标签触发浏览器下载（后端返回 Content-Disposition: attachment）
 const download = (url: string) => {
@@ -62,6 +90,25 @@ const downloadBackup = () => {
 }
 
 const downloadStudents = () => download('/api/students/export')
+
+const triggerRestore = () => restoreInput.value?.click()
+
+const onRestoreFile = async (e: Event) => {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  restoring.value = true
+  try {
+    const res = await restoreBackup(file)
+    ElMessage.success(`恢复完成：${Object.values(res).reduce((a, b) => a + b, 0)} 条数据已写入`)
+  } catch (err: any) {
+    // API 错误已由 request.ts 全局提示；这里只兜底非 API 错误
+    if (!err?.isApiError) ElMessage.error('恢复失败：' + (err?.message || '备份文件格式有误'))
+  } finally {
+    restoring.value = false
+    input.value = ''
+  }
+}
 
 const triggerImport = () => fileInput.value?.click()
 
@@ -84,7 +131,7 @@ const onImportFile = async (e: Event) => {
       `导入完成：新增 ${res.created} 名，更新 ${res.updated} 名${res.failed ? `，跳过 ${res.failed} 条` : ''}`
     )
   } catch (err: any) {
-    ElMessage.error('导入失败：' + (err?.message || '文件格式有误'))
+    if (!err?.isApiError) ElMessage.error('导入失败：' + (err?.message || '文件格式有误'))
   } finally {
     importing.value = false
     input.value = ''

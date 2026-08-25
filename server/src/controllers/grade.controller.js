@@ -2,7 +2,7 @@
 const { Op } = require('sequelize')
 const { ExamScore, Student } = require('../models')
 const { ok, fail } = require('../utils/response')
-const { cacheGet, cacheSet } = require('../utils/cache')
+const { cacheGet, cacheSet, cacheDelByPrefix } = require('../utils/cache')
 
 // 汇总聚合结果变化不频繁，加短 TTL 缓存降低数据库压力
 const SUMMARY_TTL = 10000
@@ -61,7 +61,9 @@ exports.list = async (req, res, next) => {
   try {
     const list = await ExamScore.findAll({
       where: buildWhere(req.query),
-      include: [{ model: Student, attributes: ['id', 'name', 'grade'], where: buildStudentWhere(req.query) }],
+      include: [
+        { model: Student, attributes: ['id', 'name', 'grade'], where: buildStudentWhere(req.query) }
+      ],
       order: [
         ['examDate', 'DESC'],
         ['id', 'DESC']
@@ -88,6 +90,7 @@ exports.create = async (req, res, next) => {
       defaults: payload
     })
     if (!created) await record.update(payload)
+    cacheDelByPrefix('grades:summary:')
     ok(res, record, created ? '保存成功' : '已更新同场考试成绩')
   } catch (e) {
     next(e)
@@ -112,29 +115,103 @@ exports.import = async (req, res, next) => {
       inputMap.set(keyOf(payload), payload)
     }
 
-    // 2) 一次取出全部已有成绩，按唯一键建索引，避免循环内逐条 findOne 的 N+1
-    const existing = await ExamScore.findAll()
+    // 2) 只加载本次涉及学生的已有成绩，避免全表加载
+    const studentIds = [...new Set([...inputMap.values()].map((p) => p.studentId))]
+    const existing = studentIds.length
+      ? await ExamScore.findAll({ where: { studentId: { [Op.in]: studentIds } } })
+      : []
     const byKey = new Map(existing.map((r) => [keyOf(r), r]))
 
-    // 3) 区分新增 / 更新
-    const toCreate = []
+    // 3) 区分新增 / 更新，最后用一次 bulkCreate 批量写入
+    const toWrite = []
     let updated = 0
     for (const [k, payload] of inputMap) {
       const record = byKey.get(k)
       if (record) {
-        await record.update(payload)
+        toWrite.push({ ...payload, id: record.id })
         updated++
       } else {
-        toCreate.push(payload)
+        toWrite.push(payload)
       }
     }
-    if (toCreate.length) await ExamScore.bulkCreate(toCreate)
+    if (toWrite.length) {
+      await ExamScore.bulkCreate(toWrite, {
+        updateOnDuplicate: ['score', 'fullScore', 'comment']
+      })
+    }
+    cacheDelByPrefix('grades:summary:')
 
+    const created = toWrite.length - updated
     ok(
       res,
-      { created: toCreate.length, updated, failed },
-      `导入完成：新增 ${toCreate.length} 条，更新 ${updated} 条${failed ? `，跳过 ${failed} 条非法行` : ''}`
+      { created, updated, failed },
+      `导入完成：新增 ${created} 条，更新 ${updated} 条${failed ? `，跳过 ${failed} 条非法行` : ''}`
     )
+  } catch (e) {
+    next(e)
+  }
+}
+
+// 学生卡片聚合：每个学生的考试次数 + 最近一次成绩（返回紧凑数据，避免全量成绩传到前端）
+exports.cards = async (req, res, next) => {
+  try {
+    const { studentName } = req.query
+    const [students, rows] = await Promise.all([
+      Student.findAll({ order: [['id', 'ASC']] }),
+      ExamScore.findAll({
+        where: buildWhere(req.query),
+        include: [
+          {
+            model: Student,
+            attributes: ['id', 'name', 'grade'],
+            where: buildStudentWhere(req.query)
+          }
+        ],
+        order: [
+          ['examDate', 'DESC'],
+          ['id', 'DESC']
+        ]
+      })
+    ])
+
+    const byStudent = new Map()
+    for (const r of rows) {
+      if (!byStudent.has(r.studentId)) {
+        byStudent.set(r.studentId, { examCount: 0, latest: null })
+      }
+      const agg = byStudent.get(r.studentId)
+      agg.examCount++
+      if (!agg.latest) {
+        const data = r.toJSON()
+        agg.latest = {
+          id: data.id,
+          studentId: data.studentId,
+          examType: data.examType,
+          subject: data.subject,
+          score: data.score,
+          fullScore: data.fullScore,
+          examDate: data.examDate,
+          comment: data.comment
+        }
+      }
+    }
+
+    const cards = students
+      .filter(
+        (s) => !studentName || s.name.toLowerCase().includes(String(studentName).toLowerCase())
+      )
+      .map((s) => {
+        const agg = byStudent.get(s.id) || { examCount: 0, latest: null }
+        return {
+          id: s.id,
+          name: s.name,
+          grade: s.grade,
+          examCount: agg.examCount,
+          latest: agg.latest
+        }
+      })
+
+    ok(res, cards)
   } catch (e) {
     next(e)
   }
@@ -158,7 +235,9 @@ exports.summary = async (req, res, next) => {
 
     const rows = await ExamScore.findAll({
       where: buildWhere(req.query),
-      include: [{ model: Student, attributes: ['id', 'name', 'grade'], where: buildStudentWhere(req.query) }],
+      include: [
+        { model: Student, attributes: ['id', 'name', 'grade'], where: buildStudentWhere(req.query) }
+      ],
       order: [
         ['examDate', 'ASC'],
         ['id', 'ASC']
@@ -286,6 +365,7 @@ exports.update = async (req, res, next) => {
     const record = await ExamScore.findByPk(req.params.id)
     if (!record) return fail(res, 40400, '成绩记录不存在')
     await record.update(payload)
+    cacheDelByPrefix('grades:summary:')
     ok(res, record, '更新成功')
   } catch (e) {
     next(e)
@@ -297,6 +377,7 @@ exports.remove = async (req, res, next) => {
     const record = await ExamScore.findByPk(req.params.id)
     if (!record) return fail(res, 40400, '成绩记录不存在')
     await record.destroy()
+    cacheDelByPrefix('grades:summary:')
     ok(res, null, '删除成功')
   } catch (e) {
     next(e)

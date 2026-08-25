@@ -2,15 +2,49 @@
 const { Op } = require('sequelize')
 const { Student } = require('../models')
 const { ok, fail } = require('../utils/response')
+const { cacheDel } = require('../utils/cache')
 
-// 列表（支持关键词 + 年级筛选）
+// 字段白名单：只允许写入模型定义中允许的字段，并做基本长度归一化
+const pick = (body = {}) => {
+  const out = {}
+  if (body.name !== undefined) out.name = String(body.name).slice(0, 50)
+  if (body.grade !== undefined) out.grade = body.grade ? String(body.grade).slice(0, 50) : null
+  if (body.contact !== undefined)
+    out.contact = body.contact ? String(body.contact).slice(0, 100) : null
+  if (body.remark !== undefined) out.remark = body.remark ? String(body.remark) : null
+  return out
+}
+
+const validate = (payload, { partial = false } = {}) => {
+  if (payload.name !== undefined && !String(payload.name).trim()) return '姓名不能为空'
+  if (!partial && (!payload.name || !String(payload.name).trim())) return '姓名不能为空'
+  return null
+}
+
+// 列表（支持关键词 + 年级筛选，支持分页）
 exports.list = async (req, res, next) => {
   try {
-    const { keyword, grade } = req.query
+    const { keyword, grade, page, pageSize } = req.query
     const where = {}
     if (keyword) where.name = { [Op.like]: `%${keyword}%` }
     if (grade) where.grade = grade
-    const list = await Student.findAll({ where, order: [['id', 'ASC']] })
+
+    const order = [['id', 'ASC']]
+
+    // 传了 page 才分页；兼容旧调用方（不传 page 时仍返回数组）
+    if (page !== undefined || pageSize !== undefined) {
+      const pageNum = Math.max(1, Number(page) || 1)
+      const size = Math.min(100, Math.max(1, Number(pageSize) || 20))
+      const { rows, count } = await Student.findAndCountAll({
+        where,
+        order,
+        limit: size,
+        offset: (pageNum - 1) * size
+      })
+      return ok(res, { list: rows, total: count, page: pageNum, pageSize: size })
+    }
+
+    const list = await Student.findAll({ where, order })
     ok(res, list)
   } catch (e) {
     next(e)
@@ -19,7 +53,12 @@ exports.list = async (req, res, next) => {
 
 exports.create = async (req, res, next) => {
   try {
-    const student = await Student.create(req.body)
+    const payload = pick(req.body)
+    const err = validate(payload)
+    if (err) return fail(res, 40000, err)
+    payload.name = payload.name.trim()
+    const student = await Student.create(payload)
+    cacheDel('stats:overview')
     ok(res, student, '创建成功')
   } catch (e) {
     next(e)
@@ -40,7 +79,12 @@ exports.update = async (req, res, next) => {
   try {
     const student = await Student.findByPk(req.params.id)
     if (!student) return fail(res, 40400, '学生不存在')
-    await student.update(req.body)
+    const payload = pick(req.body)
+    const err = validate(payload, { partial: true })
+    if (err) return fail(res, 40000, err)
+    if (payload.name !== undefined) payload.name = payload.name.trim()
+    await student.update(payload)
+    cacheDel('stats:overview')
     ok(res, student, '更新成功')
   } catch (e) {
     next(e)
@@ -52,6 +96,7 @@ exports.remove = async (req, res, next) => {
     const student = await Student.findByPk(req.params.id)
     if (!student) return fail(res, 40400, '学生不存在')
     await student.destroy()
+    cacheDel('stats:overview')
     ok(res, null, '删除成功')
   } catch (e) {
     next(e)
@@ -97,13 +142,13 @@ exports.import = async (req, res, next) => {
         failed++
         continue
       }
-      const payload = {
-        name: it.name,
-        grade: it.grade || null,
-        contact: it.contact || null,
-        remark: it.remark || null
+      const payload = pick(it)
+      if (!payload.name || !String(payload.name).trim()) {
+        failed++
+        continue
       }
-      const student = byName.get(it.name)
+      payload.name = payload.name.trim()
+      const student = byName.get(payload.name)
       if (student) {
         await student.update(payload)
         updated++
@@ -114,6 +159,7 @@ exports.import = async (req, res, next) => {
     }
     if (toCreate.length) await Student.bulkCreate(toCreate)
 
+    cacheDel('stats:overview')
     ok(res, { created, updated, failed }, `导入完成：新增 ${created} 名，更新 ${updated} 名`)
   } catch (e) {
     next(e)

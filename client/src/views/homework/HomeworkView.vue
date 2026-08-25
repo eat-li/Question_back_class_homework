@@ -13,7 +13,9 @@
       </el-table-column>
       <el-table-column label="截止时间" width="180">
         <template #default="{ row }">
-          <span :class="{ 'end-at--expired': isExpired(row.endAt) }">{{ formatDateTime(row.endAt) }}</span>
+          <span :class="{ 'end-at--expired': isExpired(row.endAt) }">{{
+            formatDateTime(row.endAt)
+          }}</span>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="120">
@@ -41,12 +43,15 @@
           <div class="hw-q__no">
             <span>{{ i + 1 }}.</span>
             <el-tag size="small" type="info">{{ typeLabel(q.type) }}</el-tag>
-            <el-tag v-if="q.knowledgeTag" size="small" type="warning" class="hw-q__tag">{{ q.knowledgeTag }}</el-tag>
+            <el-tag v-if="q.knowledgeTag" size="small" type="warning" class="hw-q__tag">{{
+              q.knowledgeTag
+            }}</el-tag>
           </div>
           <div class="hw-q__title"><RichContent :html="q.title" /></div>
           <div v-if="q.options && q.options.length" class="hw-q__opts">
             <div v-for="(opt, j) in q.options" :key="j" class="hw-q__opt">
-              {{ String.fromCharCode(65 + j) }}. {{ typeof opt === 'string' ? opt : JSON.stringify(opt) }}
+              {{ String.fromCharCode(65 + j) }}.
+              {{ typeof opt === 'string' ? opt : JSON.stringify(opt) }}
             </div>
           </div>
           <div v-if="q.body" class="hw-q__body"><RichContent :html="q.body" /></div>
@@ -62,29 +67,15 @@
 import { ref, onMounted } from 'vue'
 import { getHomeworks, getHomeworkQuestions } from '../../api/homework'
 import RichContent from '../../components/RichContent.vue'
+import { questionTypeLabel as typeLabel, formatDateTime } from '../../utils/format'
+import type { Homework, Question } from '../../types'
 
-const list = ref<any[]>([])
+const list = ref<Homework[]>([])
 const loading = ref(false)
 const viewVisible = ref(false)
 const detailLoading = ref(false)
-const current = ref<any>(null)
-const questions = ref<any[]>([])
-
-const typeMap: Record<string, string> = {
-  choice: '选择题',
-  fill: '填空题',
-  solve: '解答题'
-}
-const typeLabel = (t: string) => typeMap[t] || t
-
-// 日期时间格式化：DATE / ISO / 字符串 → YYYY-MM-DD HH:mm
-const formatDateTime = (d: any) => {
-  if (!d) return '—'
-  const date = new Date(d)
-  if (Number.isNaN(date.getTime())) return String(d)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
-}
+const current = ref<Homework | null>(null)
+const questions = ref<Question[]>([])
 
 // 截止时间是否已过
 const isExpired = (d: any) => {
@@ -98,8 +89,8 @@ const isExpired = (d: any) => {
 const load = async () => {
   loading.value = true
   try {
-    const all = await getHomeworks()
-    list.value = all.filter((h: any) => h.status === 'published')
+    const all = await getHomeworks({ status: 'published' })
+    list.value = all
   } finally {
     loading.value = false
   }

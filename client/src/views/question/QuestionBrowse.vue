@@ -8,7 +8,7 @@
           placeholder="搜索题干 / 补充说明"
           clearable
           style="width: 240px"
-          @keyup.enter="load"
+          @keyup.enter="search"
         />
         <el-select v-model="type" placeholder="全部题型" clearable style="width: 130px">
           <el-option label="选择题" value="choice" />
@@ -27,7 +27,7 @@
         >
           <el-option v-for="t in tags" :key="t" :label="t" :value="t" />
         </el-select>
-        <el-button type="primary" :icon="Search" @click="load">查询</el-button>
+        <el-button type="primary" :icon="Search" @click="search">查询</el-button>
         <el-button :icon="RefreshLeft" @click="reset">重置</el-button>
         <span class="count">共 {{ total }} 题</span>
       </div>
@@ -35,9 +35,9 @@
 
     <!-- 题目卡片列表 -->
     <div v-loading="loading" class="q-list">
-      <el-empty v-if="!loading && !pageList.length" description="没有符合条件的题目" />
+      <el-empty v-if="!loading && !list.length" description="没有符合条件的题目" />
 
-      <div v-for="(q, idx) in pageList" :key="q.id" class="q-card">
+      <div v-for="(q, idx) in list" :key="q.id" class="q-card">
         <div class="q-head">
           <span class="q-no">{{ (page - 1) * pageSize + idx + 1 }}</span>
           <span class="q-type" :class="`type-${q.type}`">{{ typeLabel(q.type) }}</span>
@@ -49,7 +49,9 @@
 
         <div class="q-title" @click="onContentClick"><RichContent :html="q.title || ''" /></div>
 
-        <div v-if="q.body" class="q-body" @click="onContentClick"><RichContent :html="q.body" /></div>
+        <div v-if="q.body" class="q-body" @click="onContentClick">
+          <RichContent :html="q.body" />
+        </div>
 
         <div v-if="q.options && q.options.length" class="q-options">
           <div v-for="(o, j) in q.options" :key="j" class="opt">
@@ -79,6 +81,7 @@
         :total="total"
         layout="prev, pager, next, total"
         background
+        @current-change="load"
       />
     </div>
 
@@ -92,10 +95,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { Search, RefreshLeft } from '@element-plus/icons-vue'
 import { getQuestions, getQuestionTags } from '../../api/question'
 import RichContent from '../../components/RichContent.vue'
+import type { Question } from '../../types'
 
 const typeMap: Record<string, string> = {
   choice: '选择题',
@@ -103,7 +107,7 @@ const typeMap: Record<string, string> = {
   solve: '解答题'
 }
 
-const allList = ref<any[]>([])
+const list = ref<Question[]>([])
 const loading = ref(false)
 const tags = ref<string[]>([])
 
@@ -116,10 +120,7 @@ const knowledgeTag = ref('')
 // 分页
 const page = ref(1)
 const pageSize = 10
-const total = computed(() => allList.value.length)
-const pageList = computed(() =>
-  allList.value.slice((page.value - 1) * pageSize, page.value * pageSize)
-)
+const total = ref(0)
 
 // 答案/解析展开状态
 const expanded = ref(new Set<number>())
@@ -150,16 +151,23 @@ const onContentClick = (e: MouseEvent) => {
 const load = async () => {
   loading.value = true
   try {
-    const params: any = {}
+    const params: any = { page: page.value, pageSize }
     if (keyword.value) params.keyword = keyword.value
     if (type.value) params.type = type.value
     if (difficulty.value) params.difficulty = difficulty.value
     if (knowledgeTag.value) params.knowledgeTag = knowledgeTag.value
-    allList.value = await getQuestions(params)
-    page.value = 1
+    const res = await getQuestions(params)
+    list.value = res.list
+    total.value = res.total
   } finally {
     loading.value = false
   }
+}
+
+// 查询/重置时回到第一页
+const search = () => {
+  page.value = 1
+  load()
 }
 
 const reset = () => {
@@ -167,7 +175,7 @@ const reset = () => {
   type.value = ''
   difficulty.value = ''
   knowledgeTag.value = ''
-  load()
+  search()
 }
 
 const loadTags = async () => {

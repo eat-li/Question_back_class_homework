@@ -16,4 +16,14 @@ function cacheSet(key, value, ttlMs) {
   store.set(key, { value, expireAt: Date.now() + (ttlMs || 10000) })
 }
 
-module.exports = { cacheGet, cacheSet }
+function cacheDel(key) {
+  store.delete(key)
+}
+
+function cacheDelByPrefix(prefix) {
+  for (const key of store.keys()) {
+    if (key.startsWith(prefix)) store.delete(key)
+  }
+}
+
+module.exports = { cacheGet, cacheSet, cacheDel, cacheDelByPrefix }

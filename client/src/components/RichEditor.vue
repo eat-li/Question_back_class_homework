@@ -2,59 +2,218 @@
   <div class="rich-editor" :class="{ 're-fullscreen': isFullscreen }">
     <div v-if="editor" class="re-toolbar">
       <el-tooltip content="加粗" placement="top" :show-after="400">
-        <button type="button" :class="{ active: editor.isActive('bold') }" @click="editor.chain().focus().toggleBold().run()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h9a4 4 0 0 1 0 8H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h7a4 4 0 0 1 0 8" /></svg>
+        <button
+          type="button"
+          :class="{ active: editor.isActive('bold') }"
+          @click="editor.chain().focus().toggleBold().run()"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M6 12h9a4 4 0 0 1 0 8H7a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h7a4 4 0 0 1 0 8" />
+          </svg>
         </button>
       </el-tooltip>
       <el-tooltip content="斜体" placement="top" :show-after="400">
-        <button type="button" :class="{ active: editor.isActive('italic') }" @click="editor.chain().focus().toggleItalic().run()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" x2="10" y1="4" y2="4" /><line x1="14" x2="5" y1="20" y2="20" /><line x1="15" x2="9" y1="4" y2="20" /></svg>
+        <button
+          type="button"
+          :class="{ active: editor.isActive('italic') }"
+          @click="editor.chain().focus().toggleItalic().run()"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="19" x2="10" y1="4" y2="4" />
+            <line x1="14" x2="5" y1="20" y2="20" />
+            <line x1="15" x2="9" y1="4" y2="20" />
+          </svg>
         </button>
       </el-tooltip>
       <el-tooltip content="删除线" placement="top" :show-after="400">
-        <button type="button" :class="{ active: editor.isActive('strike') }" @click="editor.chain().focus().toggleStrike().run()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4H9a3 3 0 0 0-2.83 4" /><path d="M14 12a4 4 0 0 1 0 8H6" /><line x1="4" x2="20" y1="12" y2="12" /></svg>
+        <button
+          type="button"
+          :class="{ active: editor.isActive('strike') }"
+          @click="editor.chain().focus().toggleStrike().run()"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M16 4H9a3 3 0 0 0-2.83 4" />
+            <path d="M14 12a4 4 0 0 1 0 8H6" />
+            <line x1="4" x2="20" y1="12" y2="12" />
+          </svg>
         </button>
       </el-tooltip>
       <el-tooltip content="无序列表" placement="top" :show-after="400">
-        <button type="button" :class="{ active: editor.isActive('bulletList') }" @click="editor.chain().focus().toggleBulletList().run()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" x2="21" y1="6" y2="6" /><line x1="8" x2="21" y1="12" y2="12" /><line x1="8" x2="21" y1="18" y2="18" /><line x1="3" x2="3.01" y1="6" y2="6" /><line x1="3" x2="3.01" y1="12" y2="12" /><line x1="3" x2="3.01" y1="18" y2="18" /></svg>
+        <button
+          type="button"
+          :class="{ active: editor.isActive('bulletList') }"
+          @click="editor.chain().focus().toggleBulletList().run()"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="8" x2="21" y1="6" y2="6" />
+            <line x1="8" x2="21" y1="12" y2="12" />
+            <line x1="8" x2="21" y1="18" y2="18" />
+            <line x1="3" x2="3.01" y1="6" y2="6" />
+            <line x1="3" x2="3.01" y1="12" y2="12" />
+            <line x1="3" x2="3.01" y1="18" y2="18" />
+          </svg>
         </button>
       </el-tooltip>
       <el-tooltip content="有序列表" placement="top" :show-after="400">
-        <button type="button" :class="{ active: editor.isActive('orderedList') }" @click="editor.chain().focus().toggleOrderedList().run()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" x2="21" y1="6" y2="6" /><line x1="10" x2="21" y1="12" y2="12" /><line x1="10" x2="21" y1="18" y2="18" /><path d="M4 6h1v4" /><path d="M4 10h2" /><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" /></svg>
+        <button
+          type="button"
+          :class="{ active: editor.isActive('orderedList') }"
+          @click="editor.chain().focus().toggleOrderedList().run()"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="10" x2="21" y1="6" y2="6" />
+            <line x1="10" x2="21" y1="12" y2="12" />
+            <line x1="10" x2="21" y1="18" y2="18" />
+            <path d="M4 6h1v4" />
+            <path d="M4 10h2" />
+            <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" />
+          </svg>
         </button>
       </el-tooltip>
       <el-tooltip content="插入图片" placement="top" :show-after="400">
         <button type="button" @click="pickImage">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /><circle cx="9" cy="9" r="2" /><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></svg>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+            <circle cx="9" cy="9" r="2" />
+            <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+          </svg>
         </button>
       </el-tooltip>
       <el-tooltip content="插入数学公式" placement="top" :show-after="400">
         <button type="button" @click="insertMath">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 7V4H6l6 8-6 8h12v-3" /></svg>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M18 7V4H6l6 8-6 8h12v-3" />
+          </svg>
         </button>
       </el-tooltip>
       <el-tooltip content="AI 排版" placement="top" :show-after="400">
         <button type="button" :disabled="aiLoading" @click="runAiFormat">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 2.6l1.8 4.7 4.7 1.8-4.7 1.8-1.8 4.7-1.8-4.7-4.7-1.8 4.7-1.8z" /><path d="M18 14.5l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7z" /></svg>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M9.9 2.6l1.8 4.7 4.7 1.8-4.7 1.8-1.8 4.7-1.8-4.7-4.7-1.8 4.7-1.8z" />
+            <path d="M18 14.5l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7z" />
+          </svg>
         </button>
       </el-tooltip>
       <el-tooltip content="撤销" placement="top" :show-after="400">
         <button type="button" @click="editor.chain().focus().undo().run()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6" /><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" /></svg>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M3 7v6h6" />
+            <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+          </svg>
         </button>
       </el-tooltip>
       <el-tooltip content="重做" placement="top" :show-after="400">
         <button type="button" @click="editor.chain().focus().redo().run()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6" /><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" /></svg>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M21 7v6h-6" />
+            <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" />
+          </svg>
         </button>
       </el-tooltip>
-      <el-tooltip :content="isFullscreen ? '退出全屏 (Esc)' : '全屏'" placement="top" :show-after="400">
+      <el-tooltip
+        :content="isFullscreen ? '退出全屏 (Esc)' : '全屏'"
+        placement="top"
+        :show-after="400"
+      >
         <button type="button" :class="{ active: isFullscreen }" @click="toggleFullscreen">
-          <svg v-if="!isFullscreen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3" /><path d="M21 8V5a2 2 0 0 0-2-2h-3" /><path d="M3 16v3a2 2 0 0 0 2 2h3" /><path d="M16 21h3a2 2 0 0 0 2-2v-3" /></svg>
-          <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3" /><path d="M21 8h-3a2 2 0 0 1-2-2V3" /><path d="M3 16h3a2 2 0 0 1 2 2v3" /><path d="M16 21v-3a2 2 0 0 1 2-2h3" /></svg>
+          <svg
+            v-if="!isFullscreen"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M8 3H5a2 2 0 0 0-2 2v3" />
+            <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
+            <path d="M3 16v3a2 2 0 0 0 2 2h3" />
+            <path d="M16 21h3a2 2 0 0 0 2-2v-3" />
+          </svg>
+          <svg
+            v-else
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M8 3v3a2 2 0 0 1-2 2H3" />
+            <path d="M21 8h-3a2 2 0 0 1-2-2V3" />
+            <path d="M3 16h3a2 2 0 0 1 2 2v3" />
+            <path d="M16 21v-3a2 2 0 0 1 2-2h3" />
+          </svg>
         </button>
       </el-tooltip>
     </div>
@@ -72,7 +231,9 @@
               <el-button size="small" @click="zoom(-40)">缩小</el-button>
               <el-button size="small" @click="zoom(40)">放大</el-button>
             </el-button-group>
-            <span class="img-preview-size">{{ preview.width > 0 ? preview.width + ' px' : '自适应' }}</span>
+            <span class="img-preview-size">{{
+              preview.width > 0 ? preview.width + ' px' : '自适应'
+            }}</span>
             <el-button size="small" @click="fitScreen">适应屏幕</el-button>
             <el-button size="small" @click="resetWidth">还原</el-button>
             <el-button size="small" type="primary" @click="closePreview">关闭</el-button>
@@ -92,8 +253,9 @@ import Image from '@tiptap/extension-image'
 import { Mathematics } from './math-extension'
 import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
 import { uploadImage } from '../api/upload'
-import { formatQuestion } from '../api/ai'
+import { getAiConfig, formatQuestion } from '../api/ai'
 import { loadAiConfig } from '../utils/aiConfig'
+import { sanitizeHtml } from '../utils/sanitizeHtml'
 
 const props = defineProps<{ modelValue: string }>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: string): void }>()
@@ -110,28 +272,43 @@ const runAiFormat = async () => {
     ElMessage.warning('请先在编辑器中粘贴题目内容')
     return
   }
+
   const cfg = loadAiConfig()
-  if (!cfg.apiKey) {
+  let payload: any = { text }
+
+  if (cfg.apiKey) {
+    // 前端本地配置优先
+    payload = { ...payload, apiKey: cfg.apiKey, baseUrl: cfg.baseUrl, model: cfg.model }
+  } else {
+    // 本地没配 Key 时，看后端 .env 是否已配置
     try {
-      await ElMessageBox.confirm('尚未配置 AI API Key，是否前往「系统设置」进行配置？', '提示', {
-        confirmButtonText: '去设置',
-        cancelButtonText: '取消',
-        type: 'warning'
-      })
-      router.push('/settings')
+      const backend = await getAiConfig()
+      if (!backend.hasBackendKey) {
+        await ElMessageBox.confirm('尚未配置 AI API Key，是否前往「系统设置」进行配置？', '提示', {
+          confirmButtonText: '去设置',
+          cancelButtonText: '取消',
+          type: 'warning'
+        })
+        router.push('/settings')
+        return
+      }
+      payload = { ...payload, apiKey: '', baseUrl: backend.baseUrl, model: backend.model }
     } catch {
-      /* 用户取消 */
+      // 获取后端配置失败时已由 request.ts 统一提示
+      return
     }
-    return
   }
+
   aiLoading.value = true
   const loading = ElLoading.service({ text: 'AI 排版中，请稍候…', background: 'rgba(0,0,0,0.3)' })
   try {
-    const { html } = await formatQuestion({ text, apiKey: cfg.apiKey, baseUrl: cfg.baseUrl, model: cfg.model })
-    editor.value?.commands.setContent(html || '', false)
+    const { html } = await formatQuestion(payload)
+    const safeHtml = sanitizeHtml(html || '')
+    editor.value?.commands.setContent(safeHtml, false)
     ElMessage.success('排版完成')
   } catch (e: any) {
-    ElMessage.error(e?.message || '排版失败，请检查 API Key 或网络')
+    // 错误提示已由 request.ts 全局拦截器统一弹出
+    console.error('AI 排版失败', e)
   } finally {
     loading.close()
     aiLoading.value = false
@@ -206,7 +383,8 @@ async function uploadAndInsert(file: File) {
     const { url } = await uploadImage(file)
     editor.value?.chain().focus().setImage({ src: url }).run()
   } catch (e: any) {
-    ElMessage.error(e?.message || '图片上传失败，请重试')
+    // 错误提示已由 request.ts 全局拦截器统一弹出
+    console.error('图片上传失败', e)
   } finally {
     loading.close()
   }
@@ -224,12 +402,16 @@ const onFileChange = async (e: Event) => {
 // 弹窗输入 LaTeX 后插入 $...$ 公式
 const insertMath = async () => {
   try {
-    const { value } = await ElMessageBox.prompt('输入 LaTeX 公式（例如 x^2 + y^2 = z^2）', '插入公式', {
-      confirmButtonText: '插入',
-      cancelButtonText: '取消',
-      inputPattern: /\S+/,
-      inputErrorMessage: '请输入公式内容'
-    })
+    const { value } = await ElMessageBox.prompt(
+      '输入 LaTeX 公式（例如 x^2 + y^2 = z^2）',
+      '插入公式',
+      {
+        confirmButtonText: '插入',
+        cancelButtonText: '取消',
+        inputPattern: /\S+/,
+        inputErrorMessage: '请输入公式内容'
+      }
+    )
     editor.value?.chain().focus().insertContent(`$${value}$`).run()
   } catch {
     /* 用户取消 */
@@ -250,7 +432,12 @@ const previewImgStyle = computed(() => {
   if (preview.fitScreen || preview.width <= 0) {
     return { width: 'auto', height: 'auto', maxWidth: '88vw', maxHeight: '78vh' }
   }
-  return { width: preview.width + 'px', maxWidth: '88vw', maxHeight: '78vh', objectFit: 'contain' as const }
+  return {
+    width: preview.width + 'px',
+    maxWidth: '88vw',
+    maxHeight: '78vh',
+    objectFit: 'contain' as const
+  }
 })
 
 // 点击编辑器中的图片 → 打开预览

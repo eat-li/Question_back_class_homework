@@ -8,14 +8,32 @@ const SYSTEM_PROMPT = `你是数学老师专用的题目排版助手。用户会
 3. 中文和普通文字保持原样，不翻译、不改写题意、不增删任何数字、条件或符号。
 4. 只输出排版后的 HTML 片段：不要 <html>、<body>、<head> 等外层标签，不要用 \`\`\` 代码块标记包裹，不要任何解释说明或客套话。`
 
-const DEFAULT_BASE_URL = 'https://api.openai.com/v1'
-const DEFAULT_MODEL = 'gpt-4o-mini'
+// 默认面向 DeepSeek OpenAI 兼容接口；也可通过 .env 覆盖
+const DEFAULT_BASE_URL = process.env.AI_BASE_URL || 'https://api.deepseek.com/v1'
+const DEFAULT_MODEL = process.env.AI_MODEL || 'deepseek-chat'
+
+// 返回 AI 配置状态（不返回 Key 本身），供前端判断是否需要填写 Key
+exports.config = async (req, res, next) => {
+  try {
+    const backendKey = process.env.AI_API_KEY || ''
+    ok(res, {
+      hasBackendKey: Boolean(backendKey.trim()),
+      baseUrl: process.env.AI_BASE_URL || DEFAULT_BASE_URL,
+      model: process.env.AI_MODEL || DEFAULT_MODEL
+    })
+  } catch (e) {
+    next(e)
+  }
+}
 
 exports.format = async (req, res, next) => {
   try {
     const { text, apiKey, baseUrl, model } = req.body || {}
     if (!text || !String(text).trim()) return fail(res, 40000, '没有可排版的题目内容')
-    if (!apiKey || !String(apiKey).trim()) return fail(res, 40000, '请先填写 API Key')
+
+    // 优先使用前端传入的 Key；未传时使用后端 .env 的 AI_API_KEY
+    const effectiveKey = String(apiKey || process.env.AI_API_KEY || '').trim()
+    if (!effectiveKey) return fail(res, 40000, '请先填写 API Key 或在后端 .env 配置 AI_API_KEY')
 
     const base = (baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, '')
     const url = `${base}/chat/completions`
@@ -29,7 +47,7 @@ exports.format = async (req, res, next) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${String(apiKey).trim()}`
+          Authorization: `Bearer ${effectiveKey}`
         },
         body: JSON.stringify({
           model: String(model || DEFAULT_MODEL).trim(),

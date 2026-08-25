@@ -33,33 +33,21 @@
 import { ref, onMounted } from 'vue'
 import { Search, Plus } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
-import { getQuestions } from '../../api/question'
+import { getQuestionStats } from '../../api/question'
 import QuestionFormDialog from '../../components/QuestionFormDialog.vue'
+import type { QuestionStats } from '../../types'
 
 const router = useRouter()
 const loading = ref(false)
 const keyword = ref('')
 const dialogVisible = ref(false)
-const groups = ref<any[]>([])
+const groups = ref<QuestionStats[]>([])
 
-// 拉取题目，前端按知识点分组统计（用于卡片展示）
+// 拉取知识点聚合统计，后端按知识点 GROUP BY，避免全量题目传到前端
 const load = async () => {
   loading.value = true
   try {
-    const all = await getQuestions({ keyword: keyword.value })
-    const map: Record<string, any> = {}
-    for (const q of all) {
-      const raw = q.knowledgeTag
-      const key = raw || '__empty__'
-      if (!map[key]) {
-        map[key] = { tag: key, label: raw || '未分类', total: 0, choice: 0, fill: 0, solve: 0 }
-      }
-      map[key].total += 1
-      if (q.type === 'choice') map[key].choice += 1
-      else if (q.type === 'fill') map[key].fill += 1
-      else if (q.type === 'solve') map[key].solve += 1
-    }
-    groups.value = Object.values(map).sort((a: any, b: any) => b.total - a.total)
+    groups.value = await getQuestionStats({ keyword: keyword.value })
   } finally {
     loading.value = false
   }

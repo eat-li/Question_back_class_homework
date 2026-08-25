@@ -2,14 +2,16 @@
 require('dotenv').config()
 const app = require('./app')
 const { sequelize } = require('./models')
-const { ensureIndexes } = require('./utils/ensureIndexes')
+const { runMigrations } = require('./utils/migrate')
 
 const PORT = process.env.PORT || 3000
 
 sequelize
   .authenticate()
-  .then(() => sequelize.sync({ alter: true })) // 开发期自动同步建表/补列
-  .then(() => ensureIndexes(sequelize)) // 同步后补建性能索引（不阻塞启动）
+  // sync() 只负责“创建缺失的表”，不再自动 alter 已有表结构；
+  // 后续表结构变更统一通过 server/migrations 下的迁移文件管理。
+  .then(() => sequelize.sync())
+  .then(() => runMigrations(sequelize))
   .then(() => {
     app.listen(PORT, () => console.log(`✅ 服务已启动: http://localhost:${PORT}`))
   })

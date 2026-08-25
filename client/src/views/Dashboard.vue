@@ -37,37 +37,48 @@
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { Document, User, Notebook, Trophy } from '@element-plus/icons-vue'
 import { getStats } from '../api/stats'
-import * as echarts from 'echarts/core'
-import { PieChart, BarChart } from 'echarts/charts'
-import { TitleComponent, TooltipComponent, LegendComponent, GridComponent } from 'echarts/components'
-import { CanvasRenderer } from 'echarts/renderers'
-
-echarts.use([PieChart, BarChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent, CanvasRenderer])
+import { useECharts } from '../composables/useECharts'
+import { questionTypeLabel } from '../utils/format'
 
 const stats = ref<any>(null)
 const typeRef = ref<HTMLElement>()
 const difficultyRef = ref<HTMLElement>()
 const knowledgeRef = ref<HTMLElement>()
 
-let charts: ReturnType<typeof echarts.init>[] = []
+const { init: initChart, resizeAll } = useECharts()
 
-const typeLabel = (t: string) =>
-  ({ choice: '选择题', fill: '填空题', solve: '解答题' } as Record<string, string>)[t] || t
+const typeLabel = questionTypeLabel
 
 const statCards = computed(() => {
   const c = stats.value?.counts || {}
   return [
-    { label: '题目总数', value: c.questionCount ?? 0, icon: Document, bg: '#e3ece9', color: '#46645c' },
+    {
+      label: '题目总数',
+      value: c.questionCount ?? 0,
+      icon: Document,
+      bg: '#e3ece9',
+      color: '#46645c'
+    },
     { label: '学生人数', value: c.studentCount ?? 0, icon: User, bg: '#f3eddf', color: '#a8874a' },
-    { label: '作业总数', value: c.homeworkCount ?? 0, icon: Notebook, bg: '#e9edf3', color: '#5b6b82' },
-    { label: '成绩记录', value: c.submissionCount ?? 0, icon: Trophy, bg: '#f3e9e4', color: '#a06a5a' }
+    {
+      label: '作业总数',
+      value: c.homeworkCount ?? 0,
+      icon: Notebook,
+      bg: '#e9edf3',
+      color: '#5b6b82'
+    },
+    {
+      label: '成绩记录',
+      value: c.submissionCount ?? 0,
+      icon: Trophy,
+      bg: '#f3e9e4',
+      color: '#a06a5a'
+    }
   ]
 })
 
 const renderOne = (el: HTMLElement, option: any) => {
-  const chart = echarts.init(el)
-  chart.setOption(option)
-  charts.push(chart)
+  initChart(el, option)
 }
 
 const renderCharts = () => {
@@ -160,7 +171,7 @@ const renderCharts = () => {
   })
 }
 
-const handleResize = () => charts.forEach((c) => c.resize())
+const handleResize = resizeAll
 
 const load = async () => {
   stats.value = await getStats()
@@ -175,8 +186,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
-  charts.forEach((c) => c.dispose())
-  charts = []
 })
 </script>
 
@@ -201,7 +210,9 @@ onBeforeUnmount(() => {
   border-radius: var(--radius);
   padding: 20px 22px;
   box-shadow: var(--shadow-soft);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 .stat-card:hover {
   transform: translateY(-2px);

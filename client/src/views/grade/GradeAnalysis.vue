@@ -3,10 +3,28 @@
     <!-- 筛选器 -->
     <el-card class="filter-card">
       <div class="filters">
-        <el-select v-model="fStudentId" placeholder="学生（选一人看趋势/雷达）" clearable filterable style="width: 220px" @change="load">
-          <el-option v-for="s in students" :key="s.id" :label="`${s.name}${s.grade ? '（' + s.grade + '）' : ''}`" :value="s.id" />
+        <el-select
+          v-model="fStudentId"
+          placeholder="学生（选一人看趋势/雷达）"
+          clearable
+          filterable
+          style="width: 220px"
+          @change="load"
+        >
+          <el-option
+            v-for="s in students"
+            :key="s.id"
+            :label="`${s.name}${s.grade ? '（' + s.grade + '）' : ''}`"
+            :value="s.id"
+          />
         </el-select>
-        <el-select v-model="fExamType" placeholder="考试类型" clearable style="width: 140px" @change="load">
+        <el-select
+          v-model="fExamType"
+          placeholder="考试类型"
+          clearable
+          style="width: 140px"
+          @change="load"
+        >
           <el-option v-for="t in examTypes" :key="t.value" :label="t.label" :value="t.value" />
         </el-select>
         <el-date-picker
@@ -21,7 +39,9 @@
         />
         <el-button type="primary" :icon="Search" @click="load">查询</el-button>
         <div class="toolbar-spacer"></div>
-        <el-button :icon="Download" :disabled="!trendChart" @click="exportTrendPNG">导出趋势图</el-button>
+        <el-button :icon="Download" :disabled="!trendChart" @click="exportTrendPNG"
+          >导出趋势图</el-button
+        >
         <el-button :icon="Download" @click="exportCSV">导出数据 CSV</el-button>
       </div>
     </el-card>
@@ -55,9 +75,16 @@
         <template #header><span class="chart-title">家长反馈单</span></template>
         <div class="feedback">
           <p class="feedback-summary">{{ feedbackSummary || '数据不足，无法生成小结' }}</p>
-          <el-input v-model="feedbackComment" type="textarea" :rows="3" placeholder="教师评语（可选）" />
+          <el-input
+            v-model="feedbackComment"
+            type="textarea"
+            :rows="3"
+            placeholder="教师评语（可选）"
+          />
           <div class="feedback-actions">
-            <el-button type="primary" :icon="Printer" @click="printFeedback">打印 / 另存 PDF</el-button>
+            <el-button type="primary" :icon="Printer" @click="printFeedback"
+              >打印 / 另存 PDF</el-button
+            >
           </div>
         </div>
       </el-card>
@@ -66,31 +93,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { Search, Download, Printer } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { getStudents } from '../../api/student'
-import { getGrades, getGradeSummary } from '../../api/grade'
-import * as echarts from 'echarts/core'
-import { LineChart, BarChart, PieChart } from 'echarts/charts'
-import {
-  TitleComponent,
-  TooltipComponent,
-  LegendComponent,
-  GridComponent
-} from 'echarts/components'
-import { CanvasRenderer } from 'echarts/renderers'
-
-echarts.use([
-  LineChart,
-  BarChart,
-  PieChart,
-  TitleComponent,
-  TooltipComponent,
-  LegendComponent,
-  GridComponent,
-  CanvasRenderer
-])
+import { getGrades, getGradeSummary, type GradeSummary } from '../../api/grade'
+import { escapeHtml } from '../../utils/printHtml'
+import { useECharts } from '../../composables/useECharts'
+import type { Student } from '../../types'
 
 const examTypes = [
   { value: 'final', label: '期末' },
@@ -102,8 +112,8 @@ const palette = ['#5b7d74', '#c2a878', '#8a9bb0', '#a06a5a', '#6b8f5a', '#8f7aa8
 
 const examTypeLabel = (t: string) => examTypes.find((x) => x.value === t)?.label || t
 
-const students = ref<any[]>([])
-const summary = ref<any>({ trend: [], radar: [], distribution: [], compare: [] })
+const students = ref<Student[]>([])
+const summary = ref<GradeSummary>({ trend: [], radar: [], distribution: [], compare: [] })
 const loading = ref(false)
 
 const fStudentId = ref<number | undefined>()
@@ -116,12 +126,10 @@ const trendRef = ref<HTMLElement>()
 const compareRef = ref<HTMLElement>()
 const pieRef = ref<HTMLElement>()
 
-let charts: ReturnType<typeof echarts.init>[] = []
-let trendChart: ReturnType<typeof echarts.init> | null = null
+const { init: initChart, resizeAll, disposeAll } = useECharts()
+let trendChart: any = null
 
-const hasData = computed(
-  () => summary.value.compare.length > 0 || summary.value.trend.length > 0
-)
+const hasData = computed(() => summary.value.compare.length > 0 || summary.value.trend.length > 0)
 const trendStudentName = computed(() => {
   const s = students.value.find((x) => x.id === fStudentId.value)
   return s ? `${s.name} · 数学成绩走势` : ''
@@ -134,7 +142,8 @@ const feedbackSummary = computed(() => {
   for (const t of trend) {
     const pts = t.points || []
     if (pts.length < 1) continue
-    const avg = Math.round((pts.reduce((s: number, p: any) => s + p.percent, 0) / pts.length) * 10) / 10
+    const avg =
+      Math.round((pts.reduce((s: number, p: any) => s + p.percent, 0) / pts.length) * 10) / 10
     if (pts.length < 2) {
       parts.push(`${t.subject} 目前仅 1 次记录，${pts[0].percent}%`)
       continue
@@ -154,12 +163,6 @@ const buildFilters = () => ({
   startDate: fDateRange.value?.[0] || undefined,
   endDate: fDateRange.value?.[1] || undefined
 })
-
-const disposeAll = () => {
-  charts.forEach((c) => c.dispose())
-  charts = []
-  trendChart = null
-}
 
 const renderTrend = () => {
   if (!trendRef.value || !summary.value.trend.length) return
@@ -250,8 +253,7 @@ const renderTrend = () => {
     series[0].areaStyle = { color: 'rgba(91, 125, 116, 0.12)' }
   }
 
-  const chart = echarts.init(trendRef.value)
-  chart.setOption({
+  const chart = initChart(trendRef.value, {
     color: palette,
     tooltip: {
       trigger: 'axis',
@@ -285,15 +287,13 @@ const renderTrend = () => {
     },
     series
   })
-  charts.push(chart)
   trendChart = chart
 }
 
 const renderCompare = () => {
   if (!compareRef.value) return
   const data = summary.value.compare || []
-  const chart = echarts.init(compareRef.value)
-  chart.setOption({
+  const chart = initChart(compareRef.value, {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     grid: { left: 44, right: 20, top: 20, bottom: 40 },
     xAxis: {
@@ -320,7 +320,6 @@ const renderCompare = () => {
       }
     ]
   })
-  charts.push(chart)
 }
 
 const renderPie = () => {
@@ -328,8 +327,7 @@ const renderPie = () => {
   const data = (summary.value.distribution || [])
     .filter((d: any) => d.count > 0)
     .map((d: any) => ({ name: d.label, value: d.count }))
-  const chart = echarts.init(pieRef.value)
-  chart.setOption({
+  const chart = initChart(pieRef.value, {
     tooltip: { trigger: 'item', formatter: '{b}: {c} 人次 ({d}%)' },
     legend: { bottom: 0, icon: 'circle' },
     color: ['#5b7d74', '#8a9bb0', '#c2a878', '#a06a5a'],
@@ -345,17 +343,17 @@ const renderPie = () => {
       }
     ]
   })
-  charts.push(chart)
 }
 
 const renderAll = () => {
   disposeAll()
+  trendChart = null
   renderTrend()
   renderCompare()
   renderPie()
 }
 
-const handleResize = () => charts.forEach((c) => c.resize())
+const handleResize = resizeAll
 
 const load = async () => {
   loading.value = true
@@ -392,7 +390,16 @@ const exportCSV = async () => {
   for (const r of rows) {
     const pct = r.fullScore > 0 ? Math.round((r.score / r.fullScore) * 100) : 0
     lines.push(
-      [r.student?.name, r.subject, examTypeLabel(r.examType), r.examDate, r.score, r.fullScore, pct + '%', r.comment]
+      [
+        r.student?.name,
+        r.subject,
+        examTypeLabel(r.examType),
+        r.examDate,
+        r.score,
+        r.fullScore,
+        pct + '%',
+        r.comment
+      ]
         .map(esc)
         .join(',')
     )
@@ -408,8 +415,10 @@ const exportCSV = async () => {
 // 家长反馈单：趋势图 + 小结 + 评语，打印另存 PDF
 const printFeedback = () => {
   const student = students.value.find((s) => s.id === fStudentId.value)
-  const name = student?.name || '学生'
-  const img = trendChart ? trendChart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' }) : ''
+  const name = escapeHtml(student?.name || '学生')
+  const img = trendChart
+    ? trendChart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#fff' })
+    : ''
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>家长反馈单</title>
 <style>
   body{font-family:'PingFang SC','Microsoft YaHei',sans-serif;color:#222;padding:32px;max-width:760px;margin:0 auto;}
@@ -425,8 +434,8 @@ const printFeedback = () => {
 <h1>学生成绩反馈单</h1>
 <div class="meta">学生：${name} ｜ 日期：${new Date().toLocaleDateString('zh-CN')}</div>
 ${img ? `<img class="img" src="${img}" />` : ''}
-<div class="section"><h2>学习小结</h2><div class="summary">${feedbackSummary.value || '暂无数据'}</div></div>
-<div class="section"><h2>教师评语</h2><div class="comment">${(feedbackComment.value || '——').replace(/\n/g, '<br>')}</div></div>
+<div class="section"><h2>学习小结</h2><div class="summary">${escapeHtml(feedbackSummary.value || '暂无数据')}</div></div>
+<div class="section"><h2>教师评语</h2><div class="comment">${escapeHtml(feedbackComment.value || '——').replace(/\n/g, '<br>')}</div></div>
 <div class="foot">本反馈单由教师辅助系统生成，仅供家长参考。</div>
 </body></html>`
   const win = window.open('', '_blank', 'width=820,height=900')

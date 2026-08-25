@@ -2,6 +2,7 @@
 const router = require('express').Router()
 const c = require('../controllers/ai.controller')
 
+router.get('/config', c.config)
 router.post('/format', c.format)
 
 module.exports = router

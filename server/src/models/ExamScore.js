@@ -9,7 +9,12 @@ module.exports = (sequelize, DataTypes) =>
         allowNull: false,
         comment: '考试类型：期末/期中/小测/随堂测验'
       },
-      subject: { type: DataTypes.STRING(50), allowNull: false, defaultValue: '数学', comment: '科目' },
+      subject: {
+        type: DataTypes.STRING(50),
+        allowNull: false,
+        defaultValue: '数学',
+        comment: '科目'
+      },
       score: { type: DataTypes.FLOAT, allowNull: false, comment: '得分' },
       fullScore: { type: DataTypes.FLOAT, defaultValue: 100, comment: '满分' },
       examDate: { type: DataTypes.DATEONLY, allowNull: false, comment: '考试日期' },

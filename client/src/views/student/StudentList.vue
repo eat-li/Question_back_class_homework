@@ -6,12 +6,12 @@
         placeholder="按姓名搜索"
         clearable
         style="width: 200px"
-        @keyup.enter="load"
+        @keyup.enter="search"
       />
-      <el-select v-model="grade" placeholder="年级" clearable style="width: 140px">
+      <el-select v-model="grade" placeholder="年级" clearable style="width: 140px" @change="search">
         <el-option v-for="g in gradeOptions" :key="g" :label="g" :value="g" />
       </el-select>
-      <el-button type="primary" :icon="Search" @click="load">查询</el-button>
+      <el-button type="primary" :icon="Search" @click="search">查询</el-button>
       <el-button type="primary" :icon="Plus" @click="openDialog()">新增学生</el-button>
     </div>
 
@@ -27,6 +27,17 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <div v-if="total > pageSize" class="pager">
+      <el-pagination
+        v-model:current-page="page"
+        :page-size="pageSize"
+        :total="total"
+        layout="prev, pager, next, total"
+        background
+        @current-change="load"
+      />
+    </div>
   </el-card>
 
   <el-dialog v-model="dialogVisible" :title="form.id ? '编辑学生' : '新增学生'" width="480px">
@@ -52,28 +63,55 @@ import { ref, reactive, onMounted } from 'vue'
 import { Search, Plus, Edit, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getStudents, createStudent, updateStudent, deleteStudent } from '../../api/student'
+import type { Student } from '../../types'
 
 // 年级预设选项（小学一年级 ~ 高三）
 const gradeOptions = [
-  '小学一年级', '小学二年级', '小学三年级', '小学四年级', '小学五年级', '小学六年级',
-  '初一', '初二', '初三',
-  '高一', '高二', '高三'
+  '小学一年级',
+  '小学二年级',
+  '小学三年级',
+  '小学四年级',
+  '小学五年级',
+  '小学六年级',
+  '初一',
+  '初二',
+  '初三',
+  '高一',
+  '高二',
+  '高三'
 ]
 
-const list = ref([])
+const list = ref<Student[]>([])
 const loading = ref(false)
 const keyword = ref('')
 const grade = ref('')
 const dialogVisible = ref(false)
 const form = reactive<any>({})
 
+// 分页
+const page = ref(1)
+const pageSize = 20
+const total = ref(0)
+
 const load = async () => {
   loading.value = true
   try {
-    list.value = await getStudents({ keyword: keyword.value, grade: grade.value })
+    const res = await getStudents({
+      keyword: keyword.value,
+      grade: grade.value,
+      page: page.value,
+      pageSize
+    })
+    list.value = res.list
+    total.value = res.total
   } finally {
     loading.value = false
   }
+}
+
+const search = () => {
+  page.value = 1
+  load()
 }
 
 const openDialog = (row?: any) => {
@@ -105,5 +143,10 @@ onMounted(load)
   margin-bottom: 16px;
   display: flex;
   gap: 8px;
+}
+.pager {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
 }
 </style>

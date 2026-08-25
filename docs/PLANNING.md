@@ -19,10 +19,10 @@
 
 ### 本期实现（核心 3 模块）
 
-| 模块 | 目标 |
-| --- | --- |
-| **学生管理** | 学生增删改查、班级归类、关键词检索、备注维护 |
-| **题库管理** | 题目录入/编辑/检索、题型与难度标签、参考答案与解析 |
+| 模块               | 目标                                                |
+| ------------------ | --------------------------------------------------- |
+| **学生管理**       | 学生增删改查、班级归类、关键词检索、备注维护        |
+| **题库管理**       | 题目录入/编辑/检索、题型与难度标签、参考答案与解析  |
 | **作业发布与批改** | 选题组卷、发布作业、学生提交、客观题判分 + 人工批改 |
 
 ### 后续扩展（目录已预留，暂不实现）
@@ -36,13 +36,13 @@
 
 ## 3. 技术栈
 
-| 层 | 选型 |
-| --- | --- |
-| 前端 | Vue 3 + TypeScript + Element Plus + Vite + Pinia + Vue Router + Axios |
-| 后端 | Express + Sequelize + mysql2 |
-| 数据库 | MySQL（`mysql2.sqlpub.com:3307` / 库 `webback_study`） |
-| 包管理器 | pnpm（monorepo workspace） |
-| 图片存储 | 阿里云 OSS（预留，本期不接） |
+| 层       | 选型                                                                  |
+| -------- | --------------------------------------------------------------------- |
+| 前端     | Vue 3 + TypeScript + Element Plus + Vite + Pinia + Vue Router + Axios |
+| 后端     | Express + Sequelize + mysql2                                          |
+| 数据库   | MySQL（`mysql2.sqlpub.com:3307` / 库 `webback_study`）                |
+| 包管理器 | pnpm（monorepo workspace）                                            |
+| 图片存储 | 阿里云 OSS（预留，本期不接）                                          |
 
 > ⚠️ 数据库密码、OSS AccessKey 属敏感凭据，统一放 `server/.env`（已加入 `.gitignore`），勿提交仓库。
 
@@ -97,12 +97,12 @@ sqrt/
 
 > Sequelize 统一 `underscored: true`（字段 camelCase → 列 snake_case），自动维护 `created_at` / `updated_at`。
 
-| 表名 | 关键字段 | 说明 |
-| --- | --- | --- |
-| `students` | name, student_no(唯一), class_name, contact, remark | 学生档案 |
-| `questions` | title, type, difficulty, knowledge_tag, body, options(JSON), answer, analysis | 题库（type: choice/fill/solve） |
-| `homeworks` | title, question_ids(JSON), class_names(JSON), start_at, end_at, status, remark | 作业 |
-| `submissions` | homework_id(FK), student_id(FK), answer(JSON), score, status, feedback | 提交/批改 |
+| 表名          | 关键字段                                                                       | 说明                            |
+| ------------- | ------------------------------------------------------------------------------ | ------------------------------- |
+| `students`    | name, student_no(唯一), class_name, contact, remark                            | 学生档案                        |
+| `questions`   | title, type, difficulty, knowledge_tag, body, options(JSON), answer, analysis  | 题库（type: choice/fill/solve） |
+| `homeworks`   | title, question_ids(JSON), class_names(JSON), start_at, end_at, status, remark | 作业                            |
+| `submissions` | homework_id(FK), student_id(FK), answer(JSON), score, status, feedback         | 提交/批改                       |
 
 **关联**：`homeworks 1—* submissions`，`students 1—* submissions`（在 `models/index.js` 建立）。
 
@@ -110,10 +110,10 @@ sqrt/
 
 ## 6. 里程碑
 
-| 阶段 | 内容 | 验收 |
-| --- | --- | --- |
-| M0 地基 | monorepo 骨架、前后端连通、Sequelize 同步建表 | 健康检查接口通、四表建成 |
-| M1 学生 | 学生 CRUD + 检索 | 增删改查、关键词检索可用 |
-| M2 题库 | 题目 CRUD + 检索 | 录入/编辑/检索可用 |
-| M3 作业 | 组卷发布 + 提交批改 | 端到端「选题→发布→提交→判分」 |
-| M4 收尾 | 联调、备份导出 | 可交付本地运行 |
+| 阶段    | 内容                                          | 验收                          |
+| ------- | --------------------------------------------- | ----------------------------- |
+| M0 地基 | monorepo 骨架、前后端连通、Sequelize 同步建表 | 健康检查接口通、四表建成      |
+| M1 学生 | 学生 CRUD + 检索                              | 增删改查、关键词检索可用      |
+| M2 题库 | 题目 CRUD + 检索                              | 录入/编辑/检索可用            |
+| M3 作业 | 组卷发布 + 提交批改                           | 端到端「选题→发布→提交→判分」 |
+| M4 收尾 | 联调、备份导出                                | 可交付本地运行                |

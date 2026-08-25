@@ -2,6 +2,10 @@
 // 供结论导出、作业导出、知识点题目导出共用，避免各处重复 window.open / print 样板代码。
 import renderMathInElement from 'katex/contrib/auto-render'
 import katexCss from 'katex/dist/katex.min.css?raw'
+import { sanitizeHtml } from './sanitizeHtml'
+import { escapeHtml } from './format'
+
+export { escapeHtml }
 
 // 独立打印窗口只注入 katex.min.css，不会带上 theme.css，这里补一份换行兜底样式，
 // 防止长公式 / 块级公式在打印时溢出页面。
@@ -10,23 +14,10 @@ const katexWrapCss =
   '.katex-display>.katex{white-space:normal}' +
   '.katex-display{max-width:100%;overflow-x:auto;overflow-y:hidden;padding:.4em 0}'
 
-// HTML 转义，避免纯文本字段被解析为标签
-export const escapeHtml = (s: any) =>
-  String(s ?? '').replace(/[&<>"']/g, (c) => {
-    const map: Record<string, string> = {
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;'
-    }
-    return map[c]
-  })
-
 // 把 HTML 中的 $...$ / $$...$$ 公式渲染成 KaTeX HTML（供打印窗口使用）
 export const renderMathHtml = (html: string): string => {
   const div = document.createElement('div')
-  div.innerHTML = html
+  div.innerHTML = sanitizeHtml(html)
   renderMathInElement(div, {
     delimiters: [
       { left: '$$', right: '$$', display: true },
@@ -50,9 +41,14 @@ interface PrintHtmlOptions {
 
 // 打开打印窗口并触发浏览器「打印 / 另存为 PDF」
 // 返回是否成功打开窗口（false 表示被浏览器弹窗拦截）
-export const printHtml = (title: string, bodyHtml: string, opts: PrintHtmlOptions = {}): boolean => {
+export const printHtml = (
+  title: string,
+  bodyHtml: string,
+  opts: PrintHtmlOptions = {}
+): boolean => {
   const { extraCss = '', renderMath = true, width = 900, height = 700 } = opts
-  const html = renderMath ? renderMathHtml(bodyHtml) : bodyHtml
+  const safeBody = sanitizeHtml(bodyHtml)
+  const html = renderMath ? renderMathHtml(safeBody) : safeBody
 
   const win = window.open('', '_blank', `width=${width},height=${height}`)
   if (!win) return false

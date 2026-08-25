@@ -17,7 +17,9 @@
             <el-button type="primary" :icon="Plus" @click="openCreate()">新建分类</el-button>
           </div>
 
-          <p class="cat-tree__hint">点选左侧分类即可在右侧编辑；新建时在右侧选择「上级分类」决定层级。</p>
+          <p class="cat-tree__hint">
+            点选左侧分类即可在右侧编辑；新建时在右侧选择「上级分类」决定层级。
+          </p>
 
           <div class="cat-tree__body">
             <el-tree
@@ -33,15 +35,29 @@
             >
               <template #default="{ data }">
                 <span class="tree-node" :class="{ 'is-child': isChild(data) }">
-                  <span class="tree-node__marker" :class="isChild(data) ? 'is-leaf' : 'is-parent'"></span>
+                  <span
+                    class="tree-node__marker"
+                    :class="isChild(data) ? 'is-leaf' : 'is-parent'"
+                  ></span>
                   <span class="tree-node__label">{{ data.name }}</span>
                   <span v-if="isChild(data)" class="tree-node__level">二级</span>
                   <span class="tree-node__actions">
-                    <el-tooltip v-if="!isChild(data)" content="新建子分类" placement="top" :show-after="400">
-                      <el-icon class="tree-node__icon" @click.stop="openCreate(data.id)"><Plus /></el-icon>
+                    <el-tooltip
+                      v-if="!isChild(data)"
+                      content="新建子分类"
+                      placement="top"
+                      :show-after="400"
+                    >
+                      <el-icon class="tree-node__icon" @click.stop="openCreate(data.id)"
+                        ><Plus
+                      /></el-icon>
                     </el-tooltip>
                     <el-tooltip content="删除" placement="top" :show-after="400">
-                      <el-icon class="tree-node__icon tree-node__icon--danger" @click.stop="remove(data)"><Delete /></el-icon>
+                      <el-icon
+                        class="tree-node__icon tree-node__icon--danger"
+                        @click.stop="remove(data)"
+                        ><Delete
+                      /></el-icon>
                     </el-tooltip>
                   </span>
                 </span>
@@ -69,7 +85,12 @@
               <el-input v-model="form.name" placeholder="如：代数 / 几何 / 函数" maxlength="50" />
             </el-form-item>
             <el-form-item label="上级分类">
-              <el-select v-model="form.parentId" placeholder="无（作为一级分类）" clearable style="width: 100%">
+              <el-select
+                v-model="form.parentId"
+                placeholder="无（作为一级分类）"
+                clearable
+                style="width: 100%"
+              >
                 <el-option
                   v-for="c in topLevelCategories"
                   :key="c.id"
@@ -78,18 +99,28 @@
                   :disabled="c.id === form.id"
                 />
               </el-select>
-              <div class="cat-form__tip">留空即为一级分类；选择某个一级分类后，本分类将成为其子分类（二级）。</div>
+              <div class="cat-form__tip">
+                留空即为一级分类；选择某个一级分类后，本分类将成为其子分类（二级）。
+              </div>
             </el-form-item>
             <el-form-item label="排序">
               <el-input-number v-model="form.sort" :min="0" :max="9999" />
             </el-form-item>
             <el-form-item label="备注">
-              <el-input v-model="form.remark" type="textarea" :rows="3" maxlength="255" placeholder="可选" />
+              <el-input
+                v-model="form.remark"
+                type="textarea"
+                :rows="3"
+                maxlength="255"
+                placeholder="可选"
+              />
             </el-form-item>
           </el-form>
 
           <div class="cat-form__actions">
-            <el-button v-if="form.id" type="danger" plain :icon="Delete" @click="removeSelected">删除</el-button>
+            <el-button v-if="form.id" type="danger" plain :icon="Delete" @click="removeSelected"
+              >删除</el-button
+            >
             <span class="spacer"></span>
             <el-button @click="resetForm">清空</el-button>
             <el-button type="primary" :icon="Check" @click="save">保存</el-button>
@@ -210,7 +241,8 @@ const doRemove = async (id: number) => {
     if (form.id === id) resetForm()
     await load()
   } catch (e: any) {
-    ElMessage.error(e?.message || '删除失败')
+    // 错误提示已由 request.ts 全局拦截器统一弹出
+    console.error('删除分类失败', e)
   }
 }
 
@@ -370,7 +402,9 @@ onMounted(load)
   font-size: 14px;
   padding: 2px;
   border-radius: 4px;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 }
 .tree-node__icon:hover {
   background: #fffdf9;

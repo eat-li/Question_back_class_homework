@@ -7,7 +7,8 @@ import { fileURLToPath, URL } from 'node:url'
 function manualChunks(id: string): string | undefined {
   if (!id.includes('node_modules')) return undefined
   if (id.includes('echarts') || id.includes('zrender')) return 'echarts'
-  if (id.includes('@tiptap') || id.includes('prosemirror') || id.includes('@tiptap/pm')) return 'tiptap'
+  if (id.includes('@tiptap') || id.includes('prosemirror') || id.includes('@tiptap/pm'))
+    return 'tiptap'
   if (id.includes('element-plus') || id.includes('@element-plus/icons-vue')) return 'element-plus'
   if (id.includes('katex')) return 'katex'
   if (id.includes('vue') || id.includes('@vue/') || id.includes('vue-router')) return 'vue'
@@ -27,7 +28,7 @@ export default defineConfig({
     proxy: {
       // 前端 /api 请求代理到后端
       '/api': {
-        target: 'http://localhost:3000',
+        target: process.env.VITE_API_TARGET || 'http://localhost:3000',
         changeOrigin: true
       }
     }

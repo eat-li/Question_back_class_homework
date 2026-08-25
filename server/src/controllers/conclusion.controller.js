@@ -21,7 +21,8 @@ const pick = (body) => {
   if (body.title !== undefined) out.title = String(body.title).slice(0, 200)
   if (body.categoryId !== undefined) out.categoryId = Number(body.categoryId) || null
   if (body.content !== undefined) out.content = String(body.content)
-  if (body.summary !== undefined) out.summary = body.summary ? String(body.summary).slice(0, 500) : null
+  if (body.summary !== undefined)
+    out.summary = body.summary ? String(body.summary).slice(0, 500) : null
   if (body.status !== undefined) out.status = body.status === 'published' ? 'published' : 'draft'
   if (body.tags !== undefined) out.tags = body.tags ? String(body.tags).slice(0, 255) : null
   return out

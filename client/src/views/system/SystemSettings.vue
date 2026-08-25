@@ -5,12 +5,26 @@
         <div class="block-title">AI 智能排版</div>
       </template>
       <p class="desc">
-        在这里配置一次大模型的 API Key，之后编辑题目时点编辑器工具栏的「智能排版」按钮即可一键排版，无需每次填写。
-        支持 OpenAI / DeepSeek / 通义千问 / Kimi 等任意 OpenAI 兼容接口。
+        在这里配置一次大模型的 API
+        Key，之后编辑题目时点编辑器工具栏的「智能排版」按钮即可一键排版，无需每次填写。 支持 OpenAI
+        / DeepSeek / 通义千问 / Kimi 等任意 OpenAI 兼容接口。
       </p>
+      <el-alert
+        v-if="backendConfig.hasBackendKey"
+        type="success"
+        :closable="false"
+        show-icon
+        title="后端已配置 AI API Key，前端可以留空 API Key"
+        style="margin-bottom: 16px"
+      />
       <el-form label-width="100px" style="max-width: 560px">
         <el-form-item label="API Key">
-          <el-input v-model="form.apiKey" type="password" show-password placeholder="填写你的 API Key" />
+          <el-input
+            v-model="form.apiKey"
+            type="password"
+            show-password
+            placeholder="填写你的 API Key"
+          />
         </el-form-item>
         <el-form-item label="接口地址">
           <el-select
@@ -21,8 +35,8 @@
             style="width: 100%"
             placeholder="选择或输入接口地址"
           >
-            <el-option label="OpenAI（默认）" value="https://api.openai.com/v1" />
-            <el-option label="DeepSeek" value="https://api.deepseek.com/v1" />
+            <el-option label="OpenAI" value="https://api.openai.com/v1" />
+            <el-option label="DeepSeek（推荐）" value="https://api.deepseek.com/v1" />
             <el-option label="通义千问" value="https://dashscope.aliyuncs.com/compatible-mode/v1" />
             <el-option label="Kimi" value="https://api.moonshot.cn/v1" />
           </el-select>
@@ -41,23 +55,41 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, onMounted } from 'vue'
+import { reactive, ref, onMounted } from 'vue'
 import { Check, Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { getAiConfig } from '../../api/ai'
 import { loadAiConfig, saveAiConfig, clearAiConfig } from '../../utils/aiConfig'
 
 const form = reactive({ apiKey: '', baseUrl: '', model: '' })
+const backendConfig = ref<{ hasBackendKey: boolean; baseUrl: string; model: string }>({
+  hasBackendKey: false,
+  baseUrl: '',
+  model: ''
+})
 
-onMounted(() => {
+onMounted(async () => {
   Object.assign(form, loadAiConfig())
+  try {
+    backendConfig.value = await getAiConfig()
+    // 如果本地没保存过配置，就用后端默认值预填接口地址和模型
+    if (!form.baseUrl) form.baseUrl = backendConfig.value.baseUrl
+    if (!form.model) form.model = backendConfig.value.model
+  } catch {
+    // 后端配置接口失败时保持默认，错误已由 request.ts 提示
+  }
 })
 
 const save = () => {
-  if (!form.apiKey.trim()) {
-    ElMessage.warning('请填写 API Key')
+  if (!form.apiKey.trim() && !backendConfig.value.hasBackendKey) {
+    ElMessage.warning('请填写 API Key，或在后端 .env 配置 AI_API_KEY')
     return
   }
-  saveAiConfig({ apiKey: form.apiKey.trim(), baseUrl: form.baseUrl.trim(), model: form.model.trim() })
+  saveAiConfig({
+    apiKey: form.apiKey.trim(),
+    baseUrl: form.baseUrl.trim(),
+    model: form.model.trim()
+  })
   ElMessage.success('配置已保存')
 }
 

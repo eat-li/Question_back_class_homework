@@ -11,17 +11,39 @@
       </div>
 
       <el-menu router :default-active="$route.path" class="menu">
-        <el-menu-item index="/dashboard"><el-icon><House /></el-icon><span>首页</span></el-menu-item>
-        <el-menu-item index="/students"><el-icon><User /></el-icon><span>学生管理</span></el-menu-item>
-        <el-menu-item index="/questions"><el-icon><Collection /></el-icon><span>题库管理</span></el-menu-item>
-        <el-menu-item index="/browse"><el-icon><Reading /></el-icon><span>题目浏览</span></el-menu-item>
-        <el-menu-item index="/conclusions"><el-icon><Memo /></el-icon><span>结论</span></el-menu-item>
-        <el-menu-item index="/homeworks"><el-icon><Document /></el-icon><span>作业管理</span></el-menu-item>
-        <el-menu-item index="/homework-view"><el-icon><View /></el-icon><span>查看作业</span></el-menu-item>
-        <el-menu-item index="/grades"><el-icon><DocumentAdd /></el-icon><span>成绩录入</span></el-menu-item>
-        <el-menu-item index="/grade-analysis"><el-icon><TrendCharts /></el-icon><span>成绩分析</span></el-menu-item>
-        <el-menu-item index="/backup"><el-icon><FolderOpened /></el-icon><span>数据备份</span></el-menu-item>
-        <el-menu-item index="/settings"><el-icon><Setting /></el-icon><span>系统设置</span></el-menu-item>
+        <el-menu-item index="/dashboard"
+          ><el-icon><House /></el-icon><span>首页</span></el-menu-item
+        >
+        <el-menu-item index="/students"
+          ><el-icon><User /></el-icon><span>学生管理</span></el-menu-item
+        >
+        <el-menu-item index="/questions"
+          ><el-icon><Collection /></el-icon><span>题库管理</span></el-menu-item
+        >
+        <el-menu-item index="/browse"
+          ><el-icon><Reading /></el-icon><span>题目浏览</span></el-menu-item
+        >
+        <el-menu-item index="/conclusions"
+          ><el-icon><Memo /></el-icon><span>结论</span></el-menu-item
+        >
+        <el-menu-item index="/homeworks"
+          ><el-icon><Document /></el-icon><span>作业管理</span></el-menu-item
+        >
+        <el-menu-item index="/homework-view"
+          ><el-icon><View /></el-icon><span>查看作业</span></el-menu-item
+        >
+        <el-menu-item index="/grades"
+          ><el-icon><DocumentAdd /></el-icon><span>成绩录入</span></el-menu-item
+        >
+        <el-menu-item index="/grade-analysis"
+          ><el-icon><TrendCharts /></el-icon><span>成绩分析</span></el-menu-item
+        >
+        <el-menu-item index="/backup"
+          ><el-icon><FolderOpened /></el-icon><span>数据备份</span></el-menu-item
+        >
+        <el-menu-item index="/settings"
+          ><el-icon><Setting /></el-icon><span>系统设置</span></el-menu-item
+        >
       </el-menu>
 
       <QuickLinks />
@@ -39,6 +61,7 @@
         <div class="header-right">
           <span class="greet">老师好，</span>
           <span class="date">{{ today }}</span>
+          <el-button link type="danger" @click="logout">退出登录</el-button>
         </div>
       </el-header>
 
@@ -56,9 +79,24 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { House, User, Collection, Reading, Document, View, DocumentAdd, TrendCharts, FolderOpened, Setting, Memo } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
+import {
+  House,
+  User,
+  Collection,
+  Reading,
+  Document,
+  View,
+  DocumentAdd,
+  TrendCharts,
+  FolderOpened,
+  Setting,
+  Memo
+} from '@element-plus/icons-vue'
 import QuickLinks from '../components/QuickLinks.vue'
+import { TOKEN_KEY } from '../api/request'
 
+const router = useRouter()
 const today = ref(
   new Date().toLocaleDateString('zh-CN', {
     year: 'numeric',
@@ -67,6 +105,11 @@ const today = ref(
     weekday: 'long'
   })
 )
+
+const logout = () => {
+  localStorage.removeItem(TOKEN_KEY)
+  router.push('/login')
+}
 </script>
 
 <style scoped>
@@ -216,7 +259,9 @@ const today = ref(
 
 /* —— 页面切换过渡 —— */
 .page-enter-active {
-  transition: opacity 0.22s ease, transform 0.22s ease;
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease;
 }
 .page-enter-from {
   opacity: 0;

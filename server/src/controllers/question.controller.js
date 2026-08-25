@@ -2,15 +2,51 @@
 const { Op } = require('sequelize')
 const { Question } = require('../models')
 const { ok, fail } = require('../utils/response')
-const { cacheGet, cacheSet } = require('../utils/cache')
+const { cacheGet, cacheSet, cacheDel } = require('../utils/cache')
 
 // 知识点标签变化不频繁，加短 TTL 缓存
 const TAGS_TTL = 10000
 
-// 列表（关键词/题型/难度/知识点检索）
+const TYPES = ['choice', 'fill', 'solve']
+
+// 字段白名单：只允许写入题目模型允许的字段
+const pick = (body = {}) => {
+  const out = {}
+  if (body.title !== undefined) out.title = String(body.title)
+  if (body.type !== undefined) out.type = body.type
+  if (body.difficulty !== undefined)
+    out.difficulty =
+      body.difficulty === null || body.difficulty === '' ? null : Number(body.difficulty)
+  if (body.knowledgeTag !== undefined)
+    out.knowledgeTag = body.knowledgeTag ? String(body.knowledgeTag).slice(0, 100) : null
+  if (body.body !== undefined) out.body = body.body ? String(body.body) : null
+  if (body.options !== undefined) out.options = body.options
+  if (body.answer !== undefined) out.answer = body.answer ? String(body.answer) : null
+  return out
+}
+
+const validate = (payload, { partial = false } = {}) => {
+  if (payload.title !== undefined && !String(payload.title).trim()) return '题干不能为空'
+  if (!partial && (!payload.title || !String(payload.title).trim())) return '题干不能为空'
+  if (payload.type !== undefined && !TYPES.includes(payload.type)) return '题型不合法'
+  if (payload.difficulty !== undefined && payload.difficulty !== null) {
+    const d = Number(payload.difficulty)
+    if (!Number.isInteger(d) || d < 1 || d > 5) return '难度需为 1-5 的整数'
+  }
+  if (
+    payload.options !== undefined &&
+    payload.options !== null &&
+    !Array.isArray(payload.options)
+  ) {
+    return '选项必须是数组'
+  }
+  return null
+}
+
+// 列表（关键词/题型/难度/知识点检索，支持分页）
 exports.list = async (req, res, next) => {
   try {
-    const { keyword, type, difficulty, knowledgeTag } = req.query
+    const { keyword, type, difficulty, knowledgeTag, page, pageSize } = req.query
     const where = {}
     if (keyword) where.title = { [Op.like]: `%${keyword}%` }
     if (type) where.type = type
@@ -21,8 +57,70 @@ exports.list = async (req, res, next) => {
     } else if (knowledgeTag) {
       where.knowledgeTag = knowledgeTag
     }
-    const list = await Question.findAll({ where, order: [['id', 'DESC']] })
+
+    const order = [['id', 'DESC']]
+
+    // 传了 page 才分页；兼容旧调用方（不传 page 时仍返回数组）
+    if (page !== undefined || pageSize !== undefined) {
+      const pageNum = Math.max(1, Number(page) || 1)
+      const size = Math.min(100, Math.max(1, Number(pageSize) || 20))
+      const { rows, count } = await Question.findAndCountAll({
+        where,
+        order,
+        limit: size,
+        offset: (pageNum - 1) * size
+      })
+      return ok(res, { list: rows, total: count, page: pageNum, pageSize: size })
+    }
+
+    const list = await Question.findAll({ where, order })
     ok(res, list)
+  } catch (e) {
+    next(e)
+  }
+}
+
+// 知识点卡片聚合：按知识点统计题目总数与各题型数量
+exports.stats = async (req, res, next) => {
+  try {
+    const { keyword } = req.query
+    const where = {}
+    if (keyword) where.title = { [Op.like]: `%${keyword}%` }
+
+    const rows = await Question.findAll({
+      attributes: [
+        'knowledgeTag',
+        'type',
+        [Question.sequelize.fn('COUNT', Question.sequelize.col('id')), 'count']
+      ],
+      where,
+      group: ['knowledgeTag', 'type'],
+      raw: true
+    })
+
+    const map = new Map()
+    for (const r of rows) {
+      const rawTag = r.knowledgeTag || '__empty__'
+      if (!map.has(rawTag)) {
+        map.set(rawTag, {
+          tag: rawTag,
+          label: r.knowledgeTag || '未分类',
+          total: 0,
+          choice: 0,
+          fill: 0,
+          solve: 0
+        })
+      }
+      const item = map.get(rawTag)
+      const count = Number(r.count) || 0
+      item.total += count
+      if (r.type === 'choice') item.choice += count
+      else if (r.type === 'fill') item.fill += count
+      else if (r.type === 'solve') item.solve += count
+    }
+
+    const stats = [...map.values()].sort((a, b) => b.total - a.total)
+    ok(res, stats)
   } catch (e) {
     next(e)
   }
@@ -51,7 +149,15 @@ exports.tags = async (req, res, next) => {
 
 exports.create = async (req, res, next) => {
   try {
-    const question = await Question.create(req.body)
+    const payload = pick(req.body)
+    const err = validate(payload)
+    if (err) return fail(res, 40000, err)
+    if (payload.title !== undefined) payload.title = payload.title.trim()
+    if (payload.difficulty !== undefined && payload.difficulty !== null)
+      payload.difficulty = Number(payload.difficulty)
+    const question = await Question.create(payload)
+    cacheDel('questions:tags')
+    cacheDel('stats:overview')
     ok(res, question, '创建成功')
   } catch (e) {
     next(e)
@@ -72,7 +178,15 @@ exports.update = async (req, res, next) => {
   try {
     const question = await Question.findByPk(req.params.id)
     if (!question) return fail(res, 40400, '题目不存在')
-    await question.update(req.body)
+    const payload = pick(req.body)
+    const err = validate(payload, { partial: true })
+    if (err) return fail(res, 40000, err)
+    if (payload.title !== undefined) payload.title = payload.title.trim()
+    if (payload.difficulty !== undefined && payload.difficulty !== null)
+      payload.difficulty = Number(payload.difficulty)
+    await question.update(payload)
+    cacheDel('questions:tags')
+    cacheDel('stats:overview')
     ok(res, question, '更新成功')
   } catch (e) {
     next(e)
@@ -84,6 +198,8 @@ exports.remove = async (req, res, next) => {
     const question = await Question.findByPk(req.params.id)
     if (!question) return fail(res, 40400, '题目不存在')
     await question.destroy()
+    cacheDel('questions:tags')
+    cacheDel('stats:overview')
     ok(res, null, '删除成功')
   } catch (e) {
     next(e)

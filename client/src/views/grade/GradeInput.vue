@@ -16,7 +16,9 @@
         @input="onNameInput"
         @clear="onNameInput"
       >
-        <template #prefix><el-icon><Search /></el-icon></template>
+        <template #prefix
+          ><el-icon><Search /></el-icon
+        ></template>
       </el-input>
       <el-select v-model="fExamType" placeholder="考试类型" clearable style="width: 140px">
         <el-option v-for="t in examTypes" :key="t.value" :label="t.label" :value="t.value" />
@@ -35,7 +37,7 @@
     <!-- 学生卡片：默认全量展示，按姓名实时过滤 -->
     <div class="cards" v-loading="loading">
       <div
-        v-for="c in cards"
+        v-for="c in visibleCards"
         :key="c.id"
         class="stu-card"
         :class="{ 'stu-card--empty': c.examCount === 0 }"
@@ -68,7 +70,7 @@
       </div>
 
       <el-empty
-        v-if="!loading && !cards.length"
+        v-if="!loading && !visibleCards.length"
         :description="fName ? '没有匹配的学生' : '还没有学生，请先在「学生管理」中添加'"
       />
     </div>
@@ -77,12 +79,19 @@
     <el-drawer v-model="drawerVisible" :title="`${currentStudent?.name || ''} 的成绩`" size="580px">
       <div v-if="fExamType || fExamDate" class="drawer-filter">
         已按条件过滤：
-        <el-tag v-if="fExamType" size="small" style="margin-right: 6px">{{ examTypeLabel(fExamType) }}</el-tag>
+        <el-tag v-if="fExamType" size="small" style="margin-right: 6px">{{
+          examTypeLabel(fExamType)
+        }}</el-tag>
         <el-tag v-if="fExamDate" size="small">{{ fExamDate }}</el-tag>
       </div>
 
       <div class="drawer-actions">
-        <el-button type="primary" :icon="Plus" size="small" @click="openDialog(null, currentStudent)">
+        <el-button
+          type="primary"
+          :icon="Plus"
+          size="small"
+          @click="openDialog(null, currentStudent)"
+        >
           为该生新增成绩
         </el-button>
       </div>
@@ -91,7 +100,9 @@
         <el-table-column label="日期" prop="examDate" width="120" />
         <el-table-column label="类型" width="100">
           <template #default="{ row }">
-            <el-tag :type="examTypeTag(row.examType)" size="small">{{ examTypeLabel(row.examType) }}</el-tag>
+            <el-tag :type="examTypeTag(row.examType)" size="small">{{
+              examTypeLabel(row.examType)
+            }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="得分" width="120">
@@ -101,13 +112,17 @@
           </template>
         </el-table-column>
         <el-table-column label="百分比" width="90">
-          <template #default="{ row }"><span :class="pctClass(row)">{{ percent(row) }}%</span></template>
+          <template #default="{ row }"
+            ><span :class="pctClass(row)">{{ percent(row) }}%</span></template
+          >
         </el-table-column>
         <el-table-column prop="comment" label="备注" min-width="120" show-overflow-tooltip />
         <el-table-column label="操作" width="120" fixed="right">
           <template #default="{ row }">
             <el-button size="small" :icon="Edit" @click="openDialog(row)">编辑</el-button>
-            <el-button size="small" type="danger" :icon="Delete" @click="remove(row)">删除</el-button>
+            <el-button size="small" type="danger" :icon="Delete" @click="remove(row)"
+              >删除</el-button
+            >
           </template>
         </el-table-column>
       </el-table>
@@ -119,7 +134,12 @@
       <el-form :model="form" label-width="80px">
         <el-form-item label="学生">
           <el-select v-model="form.studentId" filterable placeholder="选择学生" style="width: 100%">
-            <el-option v-for="s in students" :key="s.id" :label="`${s.name}${s.grade ? '（' + s.grade + '）' : ''}`" :value="s.id" />
+            <el-option
+              v-for="s in students"
+              :key="s.id"
+              :label="`${s.name}${s.grade ? '（' + s.grade + '）' : ''}`"
+              :value="s.id"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="考试类型">
@@ -128,12 +148,29 @@
           </el-select>
         </el-form-item>
         <el-form-item label="考试日期">
-          <el-date-picker v-model="form.examDate" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%" />
+          <el-date-picker
+            v-model="form.examDate"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="选择日期"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="得分">
-          <el-input-number v-model="form.score" :min="0" :max="form.fullScore || 1000" :precision="1" style="width: 140px" />
+          <el-input-number
+            v-model="form.score"
+            :min="0"
+            :max="form.fullScore || 1000"
+            :precision="1"
+            style="width: 140px"
+          />
           <span class="inline-tip">/ 满分</span>
-          <el-input-number v-model="form.fullScore" :min="1" :precision="1" style="width: 120px; margin-left: 8px" />
+          <el-input-number
+            v-model="form.fullScore"
+            :min="1"
+            :precision="1"
+            style="width: 120px; margin-left: 8px"
+          />
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="form.comment" placeholder="如：进步明显 / 函数仍需加强" />
@@ -155,15 +192,34 @@
             </el-select>
           </el-form-item>
           <el-form-item label="满分">
-            <el-input-number v-model="batchForm.fullScore" :min="1" :precision="1" style="width: 120px" />
+            <el-input-number
+              v-model="batchForm.fullScore"
+              :min="1"
+              :precision="1"
+              style="width: 120px"
+            />
           </el-form-item>
           <el-form-item label="考试日期">
-            <el-date-picker v-model="batchForm.examDate" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width: 150px" />
+            <el-date-picker
+              v-model="batchForm.examDate"
+              type="date"
+              value-format="YYYY-MM-DD"
+              placeholder="选择日期"
+              style="width: 150px"
+            />
           </el-form-item>
         </div>
 
         <el-form-item label="选择学生">
-          <el-select v-model="batchStudentIds" multiple filterable collapse-tags collapse-tags-tooltip placeholder="多选学生" style="width: 100%">
+          <el-select
+            v-model="batchStudentIds"
+            multiple
+            filterable
+            collapse-tags
+            collapse-tags-tooltip
+            placeholder="多选学生"
+            style="width: 100%"
+          >
             <el-option v-for="s in students" :key="s.id" :label="s.name" :value="s.id" />
           </el-select>
         </el-form-item>
@@ -173,7 +229,14 @@
         <el-table-column prop="name" label="姓名" width="140" />
         <el-table-column label="得分">
           <template #default="{ row }">
-            <el-input-number v-model="batchScores[row.id]" :min="0" :max="batchForm.fullScore" :precision="1" size="small" style="width: 160px" />
+            <el-input-number
+              v-model="batchScores[row.id]"
+              :min="0"
+              :max="batchForm.fullScore"
+              :precision="1"
+              size="small"
+              style="width: 160px"
+            />
           </template>
         </el-table-column>
       </el-table>
@@ -181,7 +244,9 @@
 
       <template #footer>
         <el-button @click="batchVisible = false">取消</el-button>
-        <el-button type="primary" :disabled="!selectedStudents.length" @click="submitBatch">确认录入</el-button>
+        <el-button type="primary" :disabled="!selectedStudents.length" @click="submitBatch"
+          >确认录入</el-button
+        >
       </template>
     </el-dialog>
   </el-card>
@@ -192,7 +257,15 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { Plus, Upload, Search, Edit, Delete, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getStudents } from '../../api/student'
-import { getGrades, createGrade, updateGrade, deleteGrade, importGrades } from '../../api/grade'
+import {
+  getGrades,
+  getGradeCards,
+  createGrade,
+  updateGrade,
+  deleteGrade,
+  importGrades
+} from '../../api/grade'
+import type { Student, ExamScore, GradeCard } from '../../types'
 
 const examTypes = [
   { value: 'final', label: '期末' },
@@ -203,12 +276,14 @@ const examTypes = [
 
 const examTypeLabel = (t: string) => examTypes.find((x) => x.value === t)?.label || t
 const examTypeTag = (t: string): 'success' | 'warning' | 'primary' | 'info' | 'danger' =>
-  (({ final: 'success', mid: 'primary', quiz: 'warning', popquiz: 'info' } as Record<string, any>)[t]) || 'info'
+  (({ final: 'success', mid: 'primary', quiz: 'warning', popquiz: 'info' }) as Record<string, any>)[
+    t
+  ] || 'info'
 
-// 所有学生（用于卡片与下拉）
-const students = ref<any[]>([])
-// 成绩数据（受考试类型 / 日期筛选影响，点击查询时刷新）
-const grades = ref<any[]>([])
+// 所有学生（用于下拉选择）
+const students = ref<Student[]>([])
+// 学生卡片聚合数据（由后端返回考试次数 + 最近一次成绩，不再把全量成绩拉到前端）
+const cards = ref<GradeCard[]>([])
 const loading = ref(false)
 
 // 筛选条件
@@ -216,37 +291,20 @@ const fName = ref('')
 const fExamType = ref('')
 const fExamDate = ref('')
 
-// 按学生分组（成绩已按日期降序，便于取“最近一次”）
-const gradesByStudent = computed(() => {
-  const m = new Map<number, any[]>()
-  for (const g of grades.value) {
-    if (!m.has(g.studentId)) m.set(g.studentId, [])
-    m.get(g.studentId)!.push(g)
-  }
-  for (const arr of m.values()) {
-    arr.sort((a, b) => (b.examDate || '').localeCompare(a.examDate || '') || b.id - a.id)
-  }
-  return m
+// 姓名实时过滤
+const visibleCards = computed(() => {
+  const kw = fName.value.trim().toLowerCase()
+  if (!kw) return cards.value
+  return cards.value.filter((c) => c.name.toLowerCase().includes(kw))
 })
-
-// 学生卡片：默认展示全部，姓名做实时模糊过滤
-const cards = computed(() =>
-  students.value
-    .filter((s) => !fName.value.trim() || s.name.toLowerCase().includes(fName.value.trim().toLowerCase()))
-    .map((s) => {
-      const gs = gradesByStudent.value.get(s.id) || []
-      return { ...s, examCount: gs.length, latest: gs[0] || null }
-    })
-)
 
 // 抽屉
 const drawerVisible = ref(false)
-const currentStudent = ref<any>(null)
-const currentGrades = computed(() =>
-  currentStudent.value ? gradesByStudent.value.get(currentStudent.value.id) || [] : []
-)
+const currentStudent = ref<GradeCard | null>(null)
+const currentGrades = ref<ExamScore[]>([])
 
-const percent = (row: any) => (row.fullScore > 0 ? Math.round((row.score / row.fullScore) * 100) : 0)
+const percent = (row: any) =>
+  row.fullScore > 0 ? Math.round((row.score / row.fullScore) * 100) : 0
 const pctClass = (row: any) => {
   const p = percent(row)
   if (p >= 90) return 'pct pct--good'
@@ -258,17 +316,25 @@ const loadStudents = async () => {
   students.value = await getStudents()
 }
 
-// 拉取成绩（考试类型 / 日期为可选筛选条件）
+// 拉取学生卡片聚合数据（考试类型 / 日期为可选筛选条件）
 const reloadGrades = async () => {
   loading.value = true
   try {
-    grades.value = await getGrades({
+    cards.value = await getGradeCards({
       examType: fExamType.value || undefined,
       examDate: fExamDate.value || undefined
     })
   } finally {
     loading.value = false
   }
+}
+
+const loadStudentGrades = async (studentId: number) => {
+  currentGrades.value = await getGrades({
+    studentId,
+    examType: fExamType.value || undefined,
+    examDate: fExamDate.value || undefined
+  })
 }
 
 const onNameInput = () => {
@@ -282,9 +348,14 @@ const reset = () => {
   reloadGrades()
 }
 
-const openDrawer = (c: any) => {
+const openDrawer = async (c: any) => {
   currentStudent.value = c
   drawerVisible.value = true
+  try {
+    await loadStudentGrades(c.id)
+  } catch {
+    // 错误提示已由 request.ts 全局拦截器统一弹出
+  }
 }
 
 // 新增 / 编辑
@@ -325,7 +396,8 @@ const save = async () => {
   if (!form.studentId) return ElMessage.warning('请选择学生')
   if (form.score == null || form.score === '') return ElMessage.warning('请输入得分')
   if (!form.examDate) return ElMessage.warning('请选择考试日期')
-  if (form.score < 0 || form.score > form.fullScore) return ElMessage.warning('得分需在 0 ~ 满分 之间')
+  if (form.score < 0 || form.score > form.fullScore)
+    return ElMessage.warning('得分需在 0 ~ 满分 之间')
 
   const payload = { ...form }
   if (form.id) {
@@ -336,7 +408,10 @@ const save = async () => {
     ElMessage.success('保存成功')
   }
   dialogVisible.value = false
-  reloadGrades()
+  await reloadGrades()
+  if (drawerVisible.value && form.studentId) {
+    await loadStudentGrades(form.studentId)
+  }
 }
 
 // 批量录入
@@ -345,7 +420,9 @@ const batchForm = reactive<any>({ examType: 'quiz', subject: '数学', fullScore
 const batchStudentIds = ref<number[]>([])
 const batchScores = reactive<Record<number, number | undefined>>({})
 
-const selectedStudents = computed(() => students.value.filter((s) => batchStudentIds.value.includes(s.id)))
+const selectedStudents = computed(() =>
+  students.value.filter((s) => batchStudentIds.value.includes(s.id))
+)
 
 const openBatch = () => {
   batchForm.examType = 'quiz'
@@ -375,7 +452,7 @@ const submitBatch = async () => {
   await importGrades(payload)
   ElMessage.success(`批量录入完成：${rows.length} 名学生`)
   batchVisible.value = false
-  reloadGrades()
+  await reloadGrades()
 }
 
 const remove = async (row: any) => {
@@ -386,7 +463,10 @@ const remove = async (row: any) => {
   )
   await deleteGrade(row.id)
   ElMessage.success('删除成功')
-  reloadGrades()
+  await reloadGrades()
+  if (drawerVisible.value && currentStudent.value) {
+    await loadStudentGrades(currentStudent.value.id)
+  }
 }
 
 onMounted(() => {
@@ -433,7 +513,10 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
 }
 .stu-card:hover {
   border-color: var(--moss);

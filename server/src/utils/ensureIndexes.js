@@ -9,13 +9,14 @@
 // 这里改用原生 DDL 在 sync 之后补建索引，并对“索引已存在”等可忽略错误做
 // 静默处理，保证应用始终能正常启动。索引均为纯性能增强，不改变任何业务行为。
 
-// 表名与索引定义：[表名, 索引名, 物理列名(已为 snake_case)]
+// 普通索引：[表名, 索引名, 物理列名(已为 snake_case)]
 const INDEXES = [
   ['student', 'idx_student_name', ['name']],
   ['student', 'idx_student_grade', ['grade']],
   ['question', 'idx_question_type', ['type']],
   ['question', 'idx_question_difficulty', ['difficulty']],
   ['question', 'idx_question_knowledge_tag', ['knowledge_tag']],
+  ['question', 'idx_question_knowledge_type_diff', ['knowledge_tag', 'type', 'difficulty']],
   ['homework', 'idx_homework_status', ['status']],
   ['submission', 'idx_submission_homework', ['homework_id']],
   ['submission', 'idx_submission_student', ['student_id']],
@@ -23,10 +24,22 @@ const INDEXES = [
   ['exam_scores', 'idx_exam_score_date', ['exam_date']],
   ['exam_scores', 'idx_exam_score_type', ['exam_type']],
   ['exam_scores', 'idx_exam_score_subject', ['subject']],
+  ['exam_scores', 'idx_exam_score_student_date', ['student_id', 'exam_date']],
+  ['exam_scores', 'idx_exam_score_type_date', ['exam_type', 'exam_date']],
   ['knowledge_categories', 'idx_knowledge_category_name', ['name']],
   ['conclusions', 'idx_conclusion_category', ['category_id']],
   ['conclusions', 'idx_conclusion_status', ['status']],
   ['conclusions', 'idx_conclusion_title', ['title']]
+]
+
+// 唯一索引：用于从数据库层面保证业务唯一性，避免并发/手工插入产生重复数据
+const UNIQUE_INDEXES = [
+  ['submission', 'uk_submission_homework_student', ['homework_id', 'student_id']],
+  [
+    'exam_scores',
+    'uk_exam_score_student_type_subject_date',
+    ['student_id', 'exam_type', 'subject', 'exam_date']
+  ]
 ]
 
 // 这些错误码表示索引/列已存在或重复，可安全忽略，不应中断启动
@@ -36,25 +49,30 @@ const IGNORE_CODES = new Set([
   'ER_DUP_FIELDNAME' // 1060 列重复
 ])
 
-async function ensureIndexes(sequelize) {
-  for (const [table, name, cols] of INDEXES) {
-    const colList = cols.map((c) => '`' + c + '`').join(', ')
-    try {
-      await sequelize.query(
-        `CREATE INDEX \`${name}\` ON \`${table}\` (${colList})`,
-        { raw: true }
-      )
-      console.log(`✔ 已确保索引 ${name} (${table})`)
-    } catch (e) {
-      const code = e.code || e.parent?.code
-      if (IGNORE_CODES.has(code)) {
-        // 索引已存在，符合预期，忽略
-        continue
-      }
-      // 其它意外错误仅告警，不中断启动（索引缺失只影响性能，不影响功能）
-      console.warn(`⚠️ 创建索引 ${name} 失败（已忽略）: ${e.message}`)
+async function createIndex(sequelize, table, name, cols, unique) {
+  const colList = cols.map((c) => '`' + c + '`').join(', ')
+  const prefix = unique ? 'CREATE UNIQUE INDEX' : 'CREATE INDEX'
+  try {
+    await sequelize.query(`${prefix} \`${name}\` ON \`${table}\` (${colList})`, { raw: true })
+    console.log(`${unique ? '✔ 已确保唯一索引' : '✔ 已确保索引'} ${name} (${table})`)
+  } catch (e) {
+    const code = e.code || e.parent?.code
+    if (IGNORE_CODES.has(code)) {
+      // 索引已存在，符合预期，忽略
+      return
     }
+    // 其它意外错误仅告警，不中断启动（索引缺失只影响性能/唯一性兜底，不影响功能）
+    console.warn(`⚠️ 创建索引 ${name} 失败（已忽略）: ${e.message}`)
   }
 }
 
-module.exports = { ensureIndexes, INDEXES }
+async function ensureIndexes(sequelize) {
+  for (const [table, name, cols] of INDEXES) {
+    await createIndex(sequelize, table, name, cols, false)
+  }
+  for (const [table, name, cols] of UNIQUE_INDEXES) {
+    await createIndex(sequelize, table, name, cols, true)
+  }
+}
+
+module.exports = { ensureIndexes, INDEXES, UNIQUE_INDEXES }

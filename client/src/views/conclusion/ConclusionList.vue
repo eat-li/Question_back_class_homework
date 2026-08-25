@@ -9,10 +9,22 @@
       </div>
 
       <div class="filters">
-        <el-select v-model="query.categoryId" placeholder="全部分类" clearable style="width: 180px" @change="onFilter">
+        <el-select
+          v-model="query.categoryId"
+          placeholder="全部分类"
+          clearable
+          style="width: 180px"
+          @change="onFilter"
+        >
           <el-option v-for="c in flatCategories" :key="c.value" :label="c.label" :value="c.value" />
         </el-select>
-        <el-select v-model="query.status" placeholder="全部状态" clearable style="width: 140px" @change="onFilter">
+        <el-select
+          v-model="query.status"
+          placeholder="全部状态"
+          clearable
+          style="width: 140px"
+          @change="onFilter"
+        >
           <el-option label="草稿" value="draft" />
           <el-option label="已发布" value="published" />
         </el-select>
@@ -28,7 +40,13 @@
         </el-input>
       </div>
 
-      <el-table :data="list" border stripe v-loading="loading" @selection-change="onSelectionChange">
+      <el-table
+        :data="list"
+        border
+        stripe
+        v-loading="loading"
+        @selection-change="onSelectionChange"
+      >
         <el-table-column type="selection" width="46" />
         <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
         <el-table-column label="分类" width="150">
@@ -56,7 +74,9 @@
               >
                 {{ row.status === 'published' ? '撤下' : '发布' }}
               </el-button>
-              <el-button size="small" type="danger" :icon="Delete" @click="remove(row)">删除</el-button>
+              <el-button size="small" type="danger" :icon="Delete" @click="remove(row)"
+                >删除</el-button
+              >
             </div>
           </template>
         </el-table-column>
@@ -79,7 +99,12 @@
     </el-card>
 
     <!-- 预览弹窗 -->
-    <el-dialog v-model="previewVisible" :title="previewData?.title || '预览'" width="720px" top="5vh">
+    <el-dialog
+      v-model="previewVisible"
+      :title="previewData?.title || '预览'"
+      width="720px"
+      top="5vh"
+    >
       <div v-if="previewData?.summary" class="preview-summary">摘要：{{ previewData.summary }}</div>
       <RichContent :html="previewData?.content || ''" />
     </el-dialog>
@@ -95,13 +120,14 @@ import { getConclusions, deleteConclusion, updateConclusionStatus } from '../../
 import { getCategories } from '../../api/category'
 import { printHtml, escapeHtml } from '../../utils/printHtml'
 import RichContent from '../../components/RichContent.vue'
+import type { Conclusion, KnowledgeCategory } from '../../types'
 
 const router = useRouter()
 
-const list = ref<any[]>([])
+const list = ref<Conclusion[]>([])
 const total = ref(0)
 const loading = ref(false)
-const selection = ref<any[]>([])
+const selection = ref<Conclusion[]>([])
 
 const query = reactive({
   categoryId: undefined as number | undefined,
@@ -114,7 +140,7 @@ const query = reactive({
 // 扁平分类（供筛选下拉，二级分类显示「父 / 子」前缀）
 const flatCategories = ref<{ value: number; label: string }[]>([])
 
-const buildFlat = (nodes: any[], prefix = '') => {
+const buildFlat = (nodes: KnowledgeCategory[], prefix = '') => {
   for (const n of nodes) {
     const label = prefix ? `${prefix} / ${n.name}` : n.name
     flatCategories.value.push({ value: n.id, label })

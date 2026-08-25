@@ -8,7 +8,9 @@
       <el-table-column prop="title" label="作业标题" />
       <el-table-column label="状态" width="100">
         <template #default="{ row }">
-          <el-tag :type="statusTagType(row.status)" size="small">{{ statusLabel(row.status) }}</el-tag>
+          <el-tag :type="statusTagType(row.status)" size="small">{{
+            statusLabel(row.status)
+          }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="题目数" width="90">
@@ -16,17 +18,32 @@
       </el-table-column>
       <el-table-column label="截止时间" width="180">
         <template #default="{ row }">
-          <span :class="{ 'end-at--expired': isExpired(row.endAt) }">{{ formatDateTime(row.endAt) }}</span>
+          <span :class="{ 'end-at--expired': isExpired(row.endAt) }">{{
+            formatDateTime(row.endAt)
+          }}</span>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="300">
         <template #default="{ row }">
           <el-button size="small" :icon="Edit" @click="openScore(row)">打分</el-button>
-          <el-button size="small" type="primary" :icon="Download" @click="openExport(row)">导出 PDF</el-button>
+          <el-button size="small" type="primary" :icon="Download" @click="openExport(row)"
+            >导出 PDF</el-button
+          >
           <el-button size="small" type="danger" :icon="Delete" @click="remove(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
+
+    <div v-if="total > pageSize" class="pager">
+      <el-pagination
+        v-model:current-page="page"
+        :page-size="pageSize"
+        :total="total"
+        layout="prev, pager, next, total"
+        background
+        @current-change="load"
+      />
+    </div>
   </el-card>
 
   <!-- 发布作业 -->
@@ -68,14 +85,20 @@
         placeholder="按题干搜索"
         clearable
         style="width: 220px"
-        @keyup.enter="loadQuestions"
+        @keyup.enter="qSearch"
       />
-      <el-select v-model="qType" placeholder="题型" clearable style="width: 130px" @change="loadQuestions">
+      <el-select
+        v-model="qType"
+        placeholder="题型"
+        clearable
+        style="width: 130px"
+        @change="qSearch"
+      >
         <el-option label="选择题" value="choice" />
         <el-option label="填空题" value="fill" />
         <el-option label="解答题" value="solve" />
       </el-select>
-      <el-button type="primary" @click="loadQuestions">查询</el-button>
+      <el-button type="primary" @click="qSearch">查询</el-button>
       <span class="picked-count">已选 {{ pickedIds.length }} 题</span>
     </div>
 
@@ -105,10 +128,23 @@
       <el-table-column prop="knowledgeTag" label="知识点" width="130" />
       <el-table-column label="操作" width="100">
         <template #default="{ row }">
-          <el-button size="small" link type="primary" @click.stop="showDetail(row)">查看详情</el-button>
+          <el-button size="small" link type="primary" @click.stop="showDetail(row)"
+            >查看详情</el-button
+          >
         </template>
       </el-table-column>
     </el-table>
+
+    <div v-if="qTotal > qPageSize" class="pager">
+      <el-pagination
+        v-model:current-page="qPage"
+        :page-size="qPageSize"
+        :total="qTotal"
+        layout="prev, pager, next, total"
+        background
+        @current-change="loadQuestions"
+      />
+    </div>
 
     <template #footer>
       <el-button @click="drawerVisible = false">取消</el-button>
@@ -154,15 +190,20 @@
     <template v-if="currentQuestion">
       <div class="q-title"><RichContent :html="currentQuestion.title" /></div>
       <el-descriptions :column="3" border class="q-meta">
-        <el-descriptions-item label="题型">{{ typeLabel(currentQuestion.type) }}</el-descriptions-item>
+        <el-descriptions-item label="题型">{{
+          typeLabel(currentQuestion.type)
+        }}</el-descriptions-item>
         <el-descriptions-item label="难度">{{ currentQuestion.difficulty }}</el-descriptions-item>
-        <el-descriptions-item label="知识点">{{ currentQuestion.knowledgeTag || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="知识点">{{
+          currentQuestion.knowledgeTag || '—'
+        }}</el-descriptions-item>
       </el-descriptions>
       <div v-if="currentQuestion.options" class="q-section">
         <div class="q-label">选项</div>
         <template v-if="Array.isArray(currentQuestion.options)">
           <div v-for="(opt, i) in currentQuestion.options" :key="i" class="q-option">
-            {{ String.fromCharCode(65 + i) }}. {{ typeof opt === 'string' ? opt : JSON.stringify(opt) }}
+            {{ String.fromCharCode(65 + i) }}.
+            {{ typeof opt === 'string' ? opt : JSON.stringify(opt) }}
           </div>
         </template>
         <div v-else>{{ JSON.stringify(currentQuestion.options) }}</div>
@@ -205,7 +246,9 @@
               <el-radio-button value="2.2">宽松</el-radio-button>
             </el-radio-group>
           </el-form-item>
-          <el-form-item label="答题留白"><el-switch v-model="layout.showAnswerArea" /></el-form-item>
+          <el-form-item label="答题留白"
+            ><el-switch v-model="layout.showAnswerArea"
+          /></el-form-item>
           <el-form-item v-if="layout.showAnswerArea" label="留白高度">
             <el-slider v-model="layout.answerAreaHeight" :min="20" :max="160" :step="10" />
           </el-form-item>
@@ -213,10 +256,16 @@
           <el-form-item v-if="layout.showScore" label="每题分值">
             <el-input-number v-model="layout.scorePerQuestion" :min="1" :max="100" />
           </el-form-item>
-          <el-form-item label="学校名称"><el-input v-model="layout.schoolName" placeholder="页眉显示" /></el-form-item>
-          <el-form-item label="姓名/年级/分数栏"><el-switch v-model="layout.showNameLine" /></el-form-item>
+          <el-form-item label="学校名称"
+            ><el-input v-model="layout.schoolName" placeholder="页眉显示"
+          /></el-form-item>
+          <el-form-item label="姓名/年级/分数栏"
+            ><el-switch v-model="layout.showNameLine"
+          /></el-form-item>
           <el-form-item label="显示题型"><el-switch v-model="layout.showType" /></el-form-item>
-          <el-form-item label="显示知识点"><el-switch v-model="layout.showKnowledge" /></el-form-item>
+          <el-form-item label="显示知识点"
+            ><el-switch v-model="layout.showKnowledge"
+          /></el-form-item>
         </el-form>
       </div>
       <div class="export-preview">
@@ -225,7 +274,10 @@
     </div>
     <template #footer>
       <div class="export-footer">
-        <span class="export-tip">提示：弹出打印窗口后，请在打印对话框的「更多设置」中取消勾选「页眉和页脚」，即可去掉左下角的 about:blank 与左上角的日期时间。</span>
+        <span class="export-tip"
+          >提示：弹出打印窗口后，请在打印对话框的「更多设置」中取消勾选「页眉和页脚」，即可去掉左下角的
+          about:blank 与左上角的日期时间。</span
+        >
         <span class="export-actions">
           <el-button @click="exportVisible = false">取消</el-button>
           <el-button type="primary" @click="doExport">导出 PDF</el-button>
@@ -269,11 +321,17 @@ import { getStudents } from '../../api/student'
 import renderMathInElement from 'katex/contrib/auto-render'
 import RichContent from '../../components/RichContent.vue'
 import { printHtml } from '../../utils/printHtml'
+import type { Homework, Question } from '../../types'
 
-const list = ref([])
-const questions = ref([])
+const list = ref<Homework[]>([])
+const questions = ref<Question[]>([])
 const loading = ref(false)
 const createVisible = ref(false)
+
+// 作业列表分页
+const page = ref(1)
+const pageSize = 20
+const total = ref(0)
 const scoreVisible = ref(false)
 const scoreRows = ref<any[]>([])
 const scoreHomeworkId = ref<number | null>(null)
@@ -288,6 +346,9 @@ const pickedIds = ref<number[]>([])
 const qKeyword = ref('')
 const qType = ref('')
 const qLoading = ref(false)
+const qPage = ref(1)
+const qPageSize = 10
+const qTotal = ref(0)
 
 // —— 选择学生状态 ——
 const studentDrawerVisible = ref(false)
@@ -346,7 +407,9 @@ const stripHtml = (html: string) =>
 const load = async () => {
   loading.value = true
   try {
-    list.value = await getHomeworks()
+    const res = await getHomeworks({ page: page.value, pageSize })
+    list.value = res.list
+    total.value = res.total
   } finally {
     loading.value = false
   }
@@ -368,15 +431,29 @@ const openCreate = () => {
 const loadQuestions = async () => {
   qLoading.value = true
   try {
-    questions.value = await getQuestions({ keyword: qKeyword.value, type: qType.value })
+    const params: any = {
+      keyword: qKeyword.value,
+      type: qType.value,
+      page: qPage.value,
+      pageSize: qPageSize
+    }
+    const res = await getQuestions(params)
+    questions.value = res.list
+    qTotal.value = res.total
   } finally {
     qLoading.value = false
   }
 }
 
+const qSearch = () => {
+  qPage.value = 1
+  loadQuestions()
+}
+
 // 打开抽题框
 const openPicker = async () => {
   pickedIds.value = [...(form.questionIds || [])]
+  qPage.value = 1
   await loadQuestions()
   drawerVisible.value = true
 }
@@ -580,10 +657,14 @@ const renderPreviewMath = () => {
 }
 
 // 预览内容变化后重新渲染公式
-watch(previewHtml, async () => {
-  await nextTick()
-  renderPreviewMath()
-}, { immediate: true })
+watch(
+  previewHtml,
+  async () => {
+    await nextTick()
+    renderPreviewMath()
+  },
+  { immediate: true }
+)
 
 // 打开导出预览
 const openExport = async (row: any) => {
@@ -752,5 +833,10 @@ onMounted(load)
 .end-at--expired {
   color: #f56c6c;
   font-weight: 600;
+}
+.pager {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
 }
 </style>

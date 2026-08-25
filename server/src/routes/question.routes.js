@@ -4,6 +4,7 @@ const c = require('../controllers/question.controller')
 
 router.get('/', c.list)
 router.get('/tags', c.tags)
+router.get('/stats', c.stats)
 router.post('/', c.create)
 router.get('/:id', c.get)
 router.patch('/:id', c.update)
