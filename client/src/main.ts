@@ -5,6 +5,7 @@ import 'katex/dist/katex.min.css'
 // 组件样式按需引入；自定义主题变量见文末 theme.css（必须在 Element Plus 之后引入，否则被覆盖）。
 import {
   ElAside,
+  ElAlert,
   ElButton,
   ElButtonGroup,
   ElCascader,
@@ -16,6 +17,9 @@ import {
   ElDescriptionsItem,
   ElDialog,
   ElDrawer,
+  ElDropdown,
+  ElDropdownItem,
+  ElDropdownMenu,
   ElEmpty,
   ElForm,
   ElFormItem,
@@ -42,6 +46,7 @@ import {
 } from 'element-plus'
 
 import 'element-plus/theme-chalk/base.css'
+import 'element-plus/theme-chalk/el-alert.css'
 import 'element-plus/theme-chalk/el-aside.css'
 import 'element-plus/theme-chalk/el-button.css'
 import 'element-plus/theme-chalk/el-button-group.css'
@@ -53,6 +58,9 @@ import 'element-plus/theme-chalk/el-descriptions.css'
 import 'element-plus/theme-chalk/el-descriptions-item.css'
 import 'element-plus/theme-chalk/el-dialog.css'
 import 'element-plus/theme-chalk/el-drawer.css'
+import 'element-plus/theme-chalk/el-dropdown.css'
+import 'element-plus/theme-chalk/el-dropdown-menu.css'
+import 'element-plus/theme-chalk/el-dropdown-item.css'
 import 'element-plus/theme-chalk/el-empty.css'
 import 'element-plus/theme-chalk/el-form.css'
 import 'element-plus/theme-chalk/el-form-item.css'
@@ -104,6 +112,7 @@ const app = createApp(App)
 
 // 全局注册用到的 Element Plus 组件（按 kebab-case 名称，匹配模板中的 <el-xxx>）
 const components: Record<string, any> = {
+  'el-alert': ElAlert,
   'el-aside': ElAside,
   'el-button': ElButton,
   'el-button-group': ElButtonGroup,
@@ -115,6 +124,9 @@ const components: Record<string, any> = {
   'el-descriptions-item': ElDescriptionsItem,
   'el-dialog': ElDialog,
   'el-drawer': ElDrawer,
+  'el-dropdown': ElDropdown,
+  'el-dropdown-item': ElDropdownItem,
+  'el-dropdown-menu': ElDropdownMenu,
   'el-empty': ElEmpty,
   'el-form': ElForm,
   'el-form-item': ElFormItem,
