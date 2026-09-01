@@ -7,12 +7,19 @@ import { escapeHtml } from './format'
 
 export { escapeHtml }
 
+// 试卷导出字体（经典试卷风）：英文/数字/标点用 Times New Roman（与 KaTeX 公式的
+// Times 风格字形统一），中文回退到宋体/思源宋体等衬线中文字体。
+// 各导出模板（作业/题目/结论）统一引用，避免各写一份。
+export const PAPER_FONT =
+  "'Times New Roman','Times','宋体','SimSun','STSong','Songti SC','Noto Serif SC',serif"
+
 // 独立打印窗口只注入 katex.min.css，不会带上 theme.css，这里补一份换行兜底样式，
-// 防止长公式 / 块级公式在打印时溢出页面。
+// 防止长公式 / 块级公式在打印时溢出页面；同时给窗口设置试卷基础字体。
 const katexWrapCss =
-  '.katex{white-space:normal;overflow-wrap:break-word;max-width:100%}' +
-  '.katex-display>.katex{white-space:normal}' +
-  '.katex-display{max-width:100%;overflow-x:auto;overflow-y:hidden;padding:.4em 0}'
+  `.katex{white-space:normal;overflow-wrap:break-word;max-width:100%}` +
+  `.katex-display>.katex{white-space:normal}` +
+  `.katex-display{max-width:100%;overflow-x:auto;overflow-y:hidden;padding:.4em 0}` +
+  `body{font-family:${PAPER_FONT};color:#222;}`
 
 // 把 HTML 中的 $...$ / $$...$$ 公式渲染成 KaTeX HTML
 // （字符串级渲染，公式被 <br> 拆成多段也能正确匹配，如 \begin{array} 表格）

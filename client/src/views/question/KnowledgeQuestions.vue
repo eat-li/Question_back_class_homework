@@ -156,7 +156,7 @@ import {
 import QuestionFormDialog from '../../components/QuestionFormDialog.vue'
 import RichContent from '../../components/RichContent.vue'
 import type { Question } from '../../types'
-import { printHtml } from '../../utils/printHtml'
+import { printHtml, PAPER_FONT } from '../../utils/printHtml'
 import { questionTypeLabel as typeLabel, escapeHtml } from '../../utils/format'
 
 const route = useRoute()
@@ -282,7 +282,7 @@ const buildQuestionsHtml = (questions: any[], withAnswer: boolean) => {
       </div>`
     )
     .join('')
-  return `<div style="font-family:'宋体','SimSun','Microsoft YaHei',serif;font-size:${fs}px;line-height:1.8;color:#222;padding:28px;max-width:800px;margin:0 auto;background:#fff;">
+  return `<div style="font-family:${PAPER_FONT};font-size:${fs}px;line-height:1.8;color:#222;padding:28px;max-width:800px;margin:0 auto;background:#fff;">
     <div style="text-align:center;border-bottom:2px solid #333;padding-bottom:12px;margin-bottom:18px;">
       <div style="font-size:${fs + 6}px;font-weight:700;">${escapeHtml(title)}</div>
       <div style="font-size:${fs - 2}px;color:#555;margin-top:6px;">共 ${questions.length} 题${withAnswer ? '（含答案）' : ''}</div>

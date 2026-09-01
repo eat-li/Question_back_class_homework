@@ -359,7 +359,7 @@ import {
 import { getQuestions, getQuestionTags, getQuestionSubTags } from '../../api/question'
 import { getStudents } from '../../api/student'
 import RichContent from '../../components/RichContent.vue'
-import { printHtml } from '../../utils/printHtml'
+import { printHtml, PAPER_FONT } from '../../utils/printHtml'
 import { renderMathInHtml } from '../../utils/mathRender'
 import type { Homework, Question } from '../../types'
 
@@ -699,7 +699,7 @@ const buildHomeworkHtml = () => {
 
   // 作业选中了学生：按学生每人一份（分页）；否则生成一份空模板
   const students = exportStudents.value.length ? exportStudents.value : [null]
-  const paperStyle = `font-family:'宋体','SimSun','Microsoft YaHei',serif;font-size:${fs}px;line-height:${lh};color:#222;padding:28px;max-width:800px;margin:0 auto;background:#fff;`
+  const paperStyle = `font-family:${PAPER_FONT};font-size:${fs}px;line-height:${lh};color:#222;padding:28px;max-width:800px;margin:0 auto;background:#fff;`
 
   return students
     .map(

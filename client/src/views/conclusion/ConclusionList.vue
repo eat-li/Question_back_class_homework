@@ -118,7 +118,7 @@ import { Plus, Download, Edit, Delete, View, Search, FolderOpened } from '@eleme
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getConclusions, deleteConclusion, updateConclusionStatus } from '../../api/conclusion'
 import { getCategories } from '../../api/category'
-import { printHtml, escapeHtml } from '../../utils/printHtml'
+import { printHtml, escapeHtml, PAPER_FONT } from '../../utils/printHtml'
 import RichContent from '../../components/RichContent.vue'
 import type { Conclusion, KnowledgeCategory } from '../../types'
 
@@ -260,7 +260,7 @@ const buildExportHtml = (items: any[], header: string) => {
     .join('')
 
   return `
-    <div style="font-family:'宋体','SimSun','Microsoft YaHei',serif;font-size:${fs}px;line-height:1.8;color:#222;padding:28px;max-width:800px;margin:0 auto;background:#fff;">
+    <div style="font-family:${PAPER_FONT};font-size:${fs}px;line-height:1.8;color:#222;padding:28px;max-width:800px;margin:0 auto;background:#fff;">
       <div style="text-align:center;border-bottom:2px solid #333;padding-bottom:12px;margin-bottom:18px;">
         <div style="font-size:${fs + 6}px;font-weight:700;">${escapeHtml(header)}</div>
         <div style="font-size:${fs - 3}px;color:#555;margin-top:6px;">共 ${items.length} 条结论</div>
