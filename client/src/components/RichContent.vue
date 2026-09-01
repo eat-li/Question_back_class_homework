@@ -1,38 +1,16 @@
 <template>
-  <div ref="root" class="rich-content" v-html="safeHtml"></div>
+  <div class="rich-content" v-html="safeHtml"></div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
-import renderMathInElement from 'katex/contrib/auto-render'
+import { computed } from 'vue'
 import { sanitizeHtml } from '../utils/sanitizeHtml'
+import { renderMathInHtml } from '../utils/mathRender'
 
 const props = defineProps<{ html: string }>()
-const root = ref<HTMLElement>()
-const safeHtml = computed(() => sanitizeHtml(props.html || ''))
 
-// 用 KaTeX auto-render 把 $...$ 公式渲染成数学公式
-const renderMath = () => {
-  if (!root.value) return
-  renderMathInElement(root.value, {
-    delimiters: [
-      { left: '$$', right: '$$', display: true },
-      { left: '$', right: '$', display: false }
-    ],
-    throwOnError: false,
-    strict: false
-  })
-}
-
-onMounted(renderMath)
-
-watch(
-  () => props.html,
-  async () => {
-    await nextTick()
-    renderMath()
-  }
-)
+// 消毒后再做字符串级 KaTeX 渲染：$...$ / $$...$$ 跨 <br> 也能正确匹配
+const safeHtml = computed(() => renderMathInHtml(sanitizeHtml(props.html || '')))
 </script>
 
 <style scoped>
@@ -46,5 +24,25 @@ watch(
 }
 .rich-content :deep(p) {
   margin: 0 0 4px;
+}
+/* 表格（含 Markdown 转换的表格） */
+.rich-content :deep(.tableWrapper) {
+  overflow-x: auto;
+  margin: 8px 0;
+}
+.rich-content :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+}
+.rich-content :deep(th),
+.rich-content :deep(td) {
+  border: 1px solid #d8d2c4;
+  padding: 6px 10px;
+  vertical-align: top;
+  text-align: left;
+}
+.rich-content :deep(th) {
+  background: #f3eddf;
+  font-weight: 600;
 }
 </style>

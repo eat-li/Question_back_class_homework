@@ -135,8 +135,40 @@
           </svg>
         </button>
       </el-tooltip>
-      <el-tooltip content="AI 排版" placement="top" :show-after="400">
-        <button type="button" :disabled="aiLoading" @click="runAiFormat">
+      <el-dropdown trigger="click" @command="onTableCommand">
+        <button type="button" class="re-table-btn">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <rect width="18" height="18" x="3" y="3" rx="1" />
+            <line x1="3" x2="21" y1="9" y2="9" />
+            <line x1="3" x2="21" y1="15" y2="15" />
+            <line x1="9" x2="9" y1="3" y2="21" />
+            <line x1="15" x2="15" y1="3" y2="21" />
+          </svg>
+          <span class="re-table-caret">▾</span>
+        </button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="markdown">粘贴 Markdown 表格</el-dropdown-item>
+            <el-dropdown-item command="blank">插入空表格 3×3</el-dropdown-item>
+            <el-dropdown-item v-if="inTable" command="rowAfter" divided>下方插入行</el-dropdown-item>
+            <el-dropdown-item v-if="inTable" command="rowBefore">上方插入行</el-dropdown-item>
+            <el-dropdown-item v-if="inTable" command="colAfter">右侧插入列</el-dropdown-item>
+            <el-dropdown-item v-if="inTable" command="colBefore">左侧插入列</el-dropdown-item>
+            <el-dropdown-item v-if="inTable" command="deleteRow" divided>删除当前行</el-dropdown-item>
+            <el-dropdown-item v-if="inTable" command="deleteCol">删除当前列</el-dropdown-item>
+            <el-dropdown-item v-if="inTable" command="deleteTable" divided>删除表格</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+      <el-dropdown trigger="click" @command="onAiCommand">
+        <button type="button" class="re-table-btn" :disabled="aiLoading">
           <svg
             viewBox="0 0 24 24"
             fill="none"
@@ -148,8 +180,15 @@
             <path d="M9.9 2.6l1.8 4.7 4.7 1.8-4.7 1.8-1.8 4.7-1.8-4.7-4.7-1.8 4.7-1.8z" />
             <path d="M18 14.5l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7z" />
           </svg>
+          <span class="re-table-caret">▾</span>
         </button>
-      </el-tooltip>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="local">本地修复公式（立即，无需联网）</el-dropdown-item>
+            <el-dropdown-item command="ai" divided>AI 智能排版（联网，可能较慢）</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
       <el-tooltip content="撤销" placement="top" :show-after="400">
         <button type="button" @click="editor.chain().focus().undo().run()">
           <svg
@@ -241,6 +280,42 @@
         </div>
       </div>
     </teleport>
+
+    <!-- AI 排版 / 公式修复 预览对话框 -->
+    <el-dialog
+      v-model="aiDialog.visible"
+      :title="aiDialog.title"
+      width="860px"
+      top="5vh"
+      append-to-body
+      destroy-on-close
+    >
+      <el-alert
+        v-if="aiDialog.issueText"
+        :title="aiDialog.issueText"
+        type="warning"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 12px"
+      />
+      <div class="ai-preview-layout">
+        <div class="ai-preview-pane">
+          <div class="ai-preview-head">原文</div>
+          <div class="ai-preview-body" v-html="aiDialog.originalHtml"></div>
+        </div>
+        <div class="ai-preview-pane">
+          <div class="ai-preview-head">排版结果</div>
+          <div class="ai-preview-body" v-html="aiDialog.resultHtml"></div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="aiDialog.visible = false">取消</el-button>
+        <el-button v-if="aiDialog.canRetry" :loading="aiLoading" @click="retryAiFormat"
+          >重新排版</el-button
+        >
+        <el-button type="primary" :loading="aiApplying" @click="applyAiResult">替换内容</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -250,22 +325,85 @@ import { useRouter } from 'vue-router'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
+import Table from '@tiptap/extension-table'
+import TableRow from '@tiptap/extension-table-row'
+import TableHeader from '@tiptap/extension-table-header'
+import TableCell from '@tiptap/extension-table-cell'
 import { Mathematics } from './math-extension'
 import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
 import { uploadImage } from '../api/upload'
 import { getAiConfig, formatQuestion } from '../api/ai'
 import { loadAiConfig } from '../utils/aiConfig'
 import { sanitizeHtml } from '../utils/sanitizeHtml'
+import { markdownTableToHtml } from '../utils/markdownTable'
+import { normalizeMathDelimiters, textToParagraphsHtml, renderMathInHtml } from '../utils/mathRender'
+import { normalizeAiMathHtml, validateAiMath } from '../utils/aiMath'
 
 const props = defineProps<{ modelValue: string }>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: string): void }>()
 
 const fileInput = ref<HTMLInputElement>()
 
-/* ===================== AI 智能排版 ===================== */
+/* ===================== AI 排版 / 本地公式修复 ===================== */
 const router = useRouter()
 const aiLoading = ref(false)
+const aiApplying = ref(false)
 
+// 排版结果预览对话框
+const aiDialog = reactive({
+  visible: false,
+  title: '',
+  originalHtml: '',
+  resultHtml: '',
+  rawHtml: '', // 原始（未渲染）结果 HTML，用于「替换内容」
+  issueText: '',
+  canRetry: false,
+  resultSource: '' // 本次结果来源，用于重试时区分 'ai' / 'local'
+})
+
+const onAiCommand = (cmd: string) => {
+  if (cmd === 'local') runLocalMathFix()
+  else if (cmd === 'ai') runAiFormat()
+}
+
+// 预览渲染：消毒 + 公式渲染
+const renderPreviewHtml = (html: string) => renderMathInHtml(sanitizeHtml(html || ''))
+
+// 打开预览对话框（original 为当前编辑器内容，result 为处理结果）
+const openAiPreview = (title: string, resultHtml: string, canRetry: boolean) => {
+  aiDialog.title = title
+  aiDialog.originalHtml = renderPreviewHtml(editor.value?.getHTML() || '')
+  aiDialog.rawHtml = resultHtml
+  aiDialog.resultHtml = renderPreviewHtml(resultHtml)
+  aiDialog.canRetry = canRetry
+  aiDialog.issueText = ''
+  const v = validateAiMath(resultHtml)
+  if (v.total && v.failed.length) {
+    aiDialog.issueText =
+      `共 ${v.total} 处公式，其中 ${v.failed.length} 处未能渲染（预览中以红色标注）：` +
+      v.failed
+        .slice(0, 3)
+        .map((f) => f.content)
+        .join(' ｜ ')
+  } else if (v.total === 0) {
+    aiDialog.issueText = '未检测到 $ 公式（若原题有公式，请检查是否被 AI 遗漏）'
+  }
+  aiDialog.visible = true
+}
+
+// 本地公式修复：不联网，立即对当前内容做 Unicode→LaTeX / 定界符归一化
+const runLocalMathFix = () => {
+  const current = editor.value?.getHTML() || ''
+  const { html, changed } = normalizeAiMathHtml(current)
+  if (!changed) {
+    ElMessage.info('未发现需要修复的公式（如 ² √ ∑ 等 Unicode 符号或错乱定界符）')
+    return
+  }
+  aiDialog.resultSource = 'local'
+  openAiPreview('公式修复预览', html, false)
+}
+
+// AI 智能排版：调用后端大模型，返回结果先规范化再预览
 const runAiFormat = async () => {
   const text = editor.value?.getText().trim()
   if (!text) {
@@ -299,19 +437,63 @@ const runAiFormat = async () => {
     }
   }
 
+  await requestAiFormat(payload)
+}
+
+// 发起 AI 请求（含超时提示与进度反馈）；失败返回 false
+const requestAiFormat = async (payload: any): Promise<boolean> => {
   aiLoading.value = true
-  const loading = ElLoading.service({ text: 'AI 排版中，请稍候…', background: 'rgba(0,0,0,0.3)' })
+  const loading = ElLoading.service({ text: 'AI 排版中（可能需要 1-2 分钟）…', background: 'rgba(0,0,0,0.3)' })
+  const t0 = Date.now()
+  const timer = setInterval(() => {
+    loading.setText(`AI 排版中… ${Math.round((Date.now() - t0) / 1000)}s`)
+  }, 1000)
   try {
     const { html } = await formatQuestion(payload)
-    const safeHtml = sanitizeHtml(html || '')
-    editor.value?.commands.setContent(safeHtml, false)
-    ElMessage.success('排版完成')
+    // 先做本地规范化（Unicode 符号 / 定界符），再预览
+    const { html: normalized } = normalizeAiMathHtml(html || '')
+    const safe = sanitizeHtml(normalized)
+    if (!safe.trim()) {
+      ElMessage.warning('AI 未返回有效内容')
+      return false
+    }
+    aiDialog.resultSource = 'ai'
+    openAiPreview('AI 排版预览', safe, true)
+    return true
   } catch (e: any) {
-    // 错误提示已由 request.ts 全局拦截器统一弹出
-    console.error('AI 排版失败', e)
+    // 超时/网络/接口错误已由 request.ts 统一提示；这里补充引导
+    const isTimeout = e?.code === 'ECONNABORTED' || /超时/.test(e?.message || '')
+    ElMessageBox.alert(
+      isTimeout
+        ? 'AI 接口响应较慢或暂时不可用。可稍后重试，或改用「本地修复公式」（立即生效，无需联网）。'
+        : '排版失败，可稍后重试，或改用「本地修复公式」。',
+      isTimeout ? 'AI 排版超时' : 'AI 排版失败',
+      { confirmButtonText: '知道了', type: isTimeout ? 'warning' : 'error' }
+    ).catch(() => {})
+    return false
   } finally {
+    clearInterval(timer)
     loading.close()
     aiLoading.value = false
+  }
+}
+
+// 重试：按来源再次执行
+const retryAiFormat = () => {
+  aiDialog.visible = false
+  if (aiDialog.resultSource === 'ai') runAiFormat()
+  else runLocalMathFix()
+}
+
+// 应用结果：用原始 HTML 替换编辑器内容（编辑器内部再按数学扩展渲染）
+const applyAiResult = () => {
+  aiApplying.value = true
+  try {
+    editor.value?.commands.setContent(sanitizeHtml(aiDialog.rawHtml), false)
+    ElMessage.success('已应用排版结果')
+    aiDialog.visible = false
+  } finally {
+    aiApplying.value = false
   }
 }
 
@@ -335,19 +517,42 @@ const ResizableImage = Image.extend({
 
 const editor = useEditor({
   content: props.modelValue || '',
-  extensions: [StarterKit, ResizableImage, Mathematics],
+  extensions: [
+    StarterKit,
+    ResizableImage,
+    Mathematics,
+    Table.configure({ resizable: true }),
+    TableRow,
+    TableHeader,
+    TableCell
+  ],
   editorProps: {
-    // 处理粘贴图片（Ctrl+V 截图）：上传到 OSS 后插入
+    // 处理粘贴：图片上传 OSS；Markdown 表格自动转换为 HTML 表格
     handlePaste: (_view, event) => {
       const items = event.clipboardData?.items
-      if (!items) return false
-      for (const item of items) {
-        if (item.type.startsWith('image/')) {
-          const file = item.getAsFile()
-          if (file) {
-            uploadAndInsert(file)
-            return true
+      if (items) {
+        for (const item of items) {
+          if (item.type.startsWith('image/')) {
+            const file = item.getAsFile()
+            if (file) {
+              uploadAndInsert(file)
+              return true
+            }
           }
+        }
+      }
+      const text = event.clipboardData?.getData('text/plain')
+      if (text) {
+        const tableHtml = markdownTableToHtml(text)
+        if (tableHtml) {
+          insertMarkdownTable?.(tableHtml)
+          return true
+        }
+        // 归一化数学定界符（$$ 包裹 $ 的错误嵌套 / 多行公式压成单行）
+        const normalized = normalizeMathDelimiters(text)
+        if (normalized !== text) {
+          insertNormalizedPaste?.(normalized)
+          return true
         }
       }
       return false
@@ -357,6 +562,84 @@ const editor = useEditor({
     emit('update:modelValue', ed.getHTML())
   }
 })
+
+// 供 handlePaste 在编辑器创建后调用（插入 Markdown 表格）
+let insertMarkdownTable: ((html: string) => void) | null = null
+insertMarkdownTable = (html) => {
+  editor.value?.chain().focus().insertContent(html).run()
+}
+
+// 供 handlePaste 插入归一化后的粘贴文本（按 HTML 解析，保留段落/换行）
+let insertNormalizedPaste: ((text: string) => void) | null = null
+insertNormalizedPaste = (text) => {
+  editor.value?.chain().focus().insertContent(textToParagraphsHtml(text)).run()
+}
+
+// —— 表格：光标是否位于表格内（用于显示行/列操作项）——
+const inTable = ref(false)
+const updateTableState = () => {
+  inTable.value = !!editor.value?.isActive('table')
+}
+editor.value?.on('selectionUpdate', updateTableState)
+editor.value?.on('transaction', updateTableState)
+
+// 表格工具栏命令
+const onTableCommand = (cmd: string) => {
+  const chain = editor.value?.chain().focus()
+  switch (cmd) {
+    case 'markdown':
+      insertTableByMarkdown()
+      break
+    case 'blank':
+      chain?.insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+      break
+    case 'rowAfter':
+      chain?.addRowAfter().run()
+      break
+    case 'rowBefore':
+      chain?.addRowBefore().run()
+      break
+    case 'colAfter':
+      chain?.addColumnAfter().run()
+      break
+    case 'colBefore':
+      chain?.addColumnBefore().run()
+      break
+    case 'deleteRow':
+      chain?.deleteRow().run()
+      break
+    case 'deleteCol':
+      chain?.deleteColumn().run()
+      break
+    case 'deleteTable':
+      chain?.deleteTable().run()
+      break
+  }
+}
+
+// 弹窗粘贴 Markdown 表格 → 转换为 HTML 表格插入
+const insertTableByMarkdown = async () => {
+  try {
+    const { value } = await ElMessageBox.prompt(
+      '粘贴 Markdown 表格（GitHub 风格）：\n\n| 列1 | 列2 | 列3 |\n| --- | --- | --- |\n| a | b | c |',
+      '插入表格',
+      {
+        inputType: 'textarea',
+        inputAutosize: { minRows: 5, maxRows: 12 },
+        confirmButtonText: '插入',
+        cancelButtonText: '取消'
+      }
+    )
+    const html = markdownTableToHtml(value || '')
+    if (!html) {
+      ElMessage.warning('未识别到 Markdown 表格，请检查格式（需包含表头与分隔行）')
+      return
+    }
+    editor.value?.chain().focus().insertContent(html).run()
+  } catch {
+    /* 用户取消 */
+  }
+}
 
 // 外部回显（编辑已有题目时把 HTML 塞回编辑器）
 watch(
@@ -600,6 +883,45 @@ onBeforeUnmount(() => {
   margin: 6px 0;
   overflow-x: auto;
 }
+/* —— 表格 —— */
+.re-content :deep(.tableWrapper) {
+  overflow-x: auto;
+  margin: 8px 0;
+}
+.re-content :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 320px;
+}
+.re-content :deep(th),
+.re-content :deep(td) {
+  border: 1px solid #d0c9bd;
+  padding: 6px 10px;
+  vertical-align: top;
+  text-align: left;
+}
+.re-content :deep(th) {
+  background: #f3eddf;
+  font-weight: 600;
+}
+.re-content :deep(.selectedCell) {
+  background: var(--moss-soft);
+}
+.re-content :deep(.column-resize-handle) {
+  background: var(--moss);
+  width: 2px;
+}
+.re-table-btn {
+  width: auto !important;
+  padding: 0 6px !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.re-table-caret {
+  font-size: 10px;
+  line-height: 1;
+}
 .re-hidden {
   display: none;
 }
@@ -646,5 +968,59 @@ onBeforeUnmount(() => {
   min-width: 56px;
   text-align: center;
   font-variant-numeric: tabular-nums;
+}
+
+/* —— AI 排版 / 公式修复 预览对话框 —— */
+.ai-preview-layout {
+  display: flex;
+  gap: 14px;
+  height: 52vh;
+}
+.ai-preview-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.ai-preview-head {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  background: #f6f1e7;
+  border-bottom: 1px solid var(--line);
+}
+.ai-preview-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--ink);
+  word-break: break-word;
+  background: #fffdf9;
+}
+.ai-preview-body p {
+  margin: 0 0 4px;
+}
+.ai-preview-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 6px 0;
+}
+.ai-preview-body th,
+.ai-preview-body td {
+  border: 1px solid #d8d2c4;
+  padding: 5px 9px;
+}
+.ai-preview-body th {
+  background: #f3eddf;
+  font-weight: 600;
+}
+.ai-preview-body img {
+  max-width: 100%;
 }
 </style>

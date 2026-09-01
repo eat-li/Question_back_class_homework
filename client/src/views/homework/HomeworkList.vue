@@ -309,7 +309,7 @@
         </el-form>
       </div>
       <div class="export-preview">
-        <div ref="previewRef" class="paper" v-html="previewHtml"></div>
+        <div class="paper" v-html="previewHtml"></div>
       </div>
     </div>
     <template #footer>
@@ -345,7 +345,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { Plus, Edit, Download, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -358,9 +358,9 @@ import {
 } from '../../api/homework'
 import { getQuestions, getQuestionTags, getQuestionSubTags } from '../../api/question'
 import { getStudents } from '../../api/student'
-import renderMathInElement from 'katex/contrib/auto-render'
 import RichContent from '../../components/RichContent.vue'
 import { printHtml } from '../../utils/printHtml'
+import { renderMathInHtml } from '../../utils/mathRender'
 import type { Homework, Question } from '../../types'
 
 const list = ref<Homework[]>([])
@@ -709,34 +709,8 @@ const buildHomeworkHtml = () => {
     .join('')
 }
 
-// 预览 HTML（响应式，选项变化即刷新）
-const previewHtml = computed(() => buildHomeworkHtml())
-
-const previewRef = ref<HTMLElement>()
-
-// 对预览 DOM 渲染 $...$ 公式
-const renderPreviewMath = () => {
-  if (previewRef.value) {
-    renderMathInElement(previewRef.value, {
-      delimiters: [
-        { left: '$$', right: '$$', display: true },
-        { left: '$', right: '$', display: false }
-      ],
-      throwOnError: false,
-      strict: false
-    })
-  }
-}
-
-// 预览内容变化后重新渲染公式
-watch(
-  previewHtml,
-  async () => {
-    await nextTick()
-    renderPreviewMath()
-  },
-  { immediate: true }
-)
+// 预览 HTML（字符串级 KaTeX 渲染：公式跨 <br> 也能正确匹配，如 \begin{array} 表格）
+const previewHtml = computed(() => renderMathInHtml(buildHomeworkHtml()))
 
 // 打开导出预览
 const openExport = async (row: any) => {

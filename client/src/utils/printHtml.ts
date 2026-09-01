@@ -1,8 +1,8 @@
 // 公共打印工具：统一「打开独立打印窗口 + 注入 KaTeX 样式 + 渲染公式 + 触发打印」逻辑。
 // 供结论导出、作业导出、知识点题目导出共用，避免各处重复 window.open / print 样板代码。
-import renderMathInElement from 'katex/contrib/auto-render'
 import katexCss from 'katex/dist/katex.min.css?raw'
 import { sanitizeHtml } from './sanitizeHtml'
+import { renderMathInHtml } from './mathRender'
 import { escapeHtml } from './format'
 
 export { escapeHtml }
@@ -14,20 +14,9 @@ const katexWrapCss =
   '.katex-display>.katex{white-space:normal}' +
   '.katex-display{max-width:100%;overflow-x:auto;overflow-y:hidden;padding:.4em 0}'
 
-// 把 HTML 中的 $...$ / $$...$$ 公式渲染成 KaTeX HTML（供打印窗口使用）
-export const renderMathHtml = (html: string): string => {
-  const div = document.createElement('div')
-  div.innerHTML = sanitizeHtml(html)
-  renderMathInElement(div, {
-    delimiters: [
-      { left: '$$', right: '$$', display: true },
-      { left: '$', right: '$', display: false }
-    ],
-    throwOnError: false,
-    strict: false
-  })
-  return div.innerHTML
-}
+// 把 HTML 中的 $...$ / $$...$$ 公式渲染成 KaTeX HTML
+// （字符串级渲染，公式被 <br> 拆成多段也能正确匹配，如 \begin{array} 表格）
+export const renderMathHtml = (html: string): string => renderMathInHtml(html)
 
 interface PrintHtmlOptions {
   // 额外注入的 CSS（如排版样式）；默认只注入 katex 与换行兜底
