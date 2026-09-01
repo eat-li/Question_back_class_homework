@@ -4,6 +4,11 @@ const { requireAuth } = require('../middlewares/auth')
 
 // 登录接口公开，其余业务接口都需要登录
 router.use('/auth', require('./auth.routes'))
+
+// 只读开放接口：自带 requireReadonly（仅允许 GET/HEAD + 有效令牌），
+// 必须挂在 requireAuth 之前，否则会被管理员鉴权挡住
+router.use('/open', require('./open.routes'))
+
 router.use(requireAuth)
 
 router.use('/students', require('./student.routes'))

@@ -2,7 +2,9 @@
   <div class="quick-links">
     <div class="ql-head">
       <span class="ql-title">常用链接</span>
-      <button class="ql-add" type="button" title="添加链接" @click="openAdd">+</button>
+      <button class="ql-add" type="button" title="添加链接" @click="openAdd">
+        <el-icon :size="13"><Plus /></el-icon>
+      </button>
     </div>
 
     <div v-if="!links.length" class="ql-empty">暂无收藏</div>
@@ -11,7 +13,9 @@
       <a class="ql-name" :href="l.url" target="_blank" rel="noopener" :title="l.url">{{
         l.name
       }}</a>
-      <button class="ql-del" type="button" title="删除" @click="remove(i)">×</button>
+      <button class="ql-del" type="button" title="删除" @click="remove(i)">
+        <el-icon :size="13"><Close /></el-icon>
+      </button>
     </div>
 
     <el-dialog v-model="dialogVisible" title="添加常用链接" width="380px" append-to-body>
@@ -33,6 +37,7 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
+import { Plus, Close } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
 const STORAGE_KEY = 'common-links'
@@ -154,6 +159,9 @@ const remove = (i: number) => {
   border-radius: 4px;
   flex-shrink: 0;
   padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .ql-del:hover {
   color: #c0392b;

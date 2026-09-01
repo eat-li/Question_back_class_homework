@@ -1,17 +1,14 @@
 <script>
 export default {
-  onLaunch: function () {
-    console.log('App Launch')
-  },
-  onShow: function () {
-    console.log('App Show')
-  },
-  onHide: function () {
-    console.log('App Hide')
+  onLaunch() {
+    // 首屏就要能看到内容，所以这里不做任何阻塞性初始化。
+    // 访客令牌由 utils/request.js 在第一次请求时懒加载。
   }
 }
 </script>
 
 <style>
-/*每个页面公共css */
+page {
+  background: #f5f6f8;
+}
 </style>

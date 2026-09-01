@@ -67,6 +67,7 @@ import { Download, Upload } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { importStudents } from '../../api/student'
 import { restoreBackup } from '../../api/backup'
+import { downloadFile } from '../../api/request'
 
 const backupLoading = ref(false)
 const importing = ref(false)
@@ -74,22 +75,20 @@ const restoring = ref(false)
 const fileInput = ref<HTMLInputElement>()
 const restoreInput = ref<HTMLInputElement>()
 
-// 通过隐藏 a 标签触发浏览器下载（后端返回 Content-Disposition: attachment）
-const download = (url: string) => {
-  const a = document.createElement('a')
-  a.href = url
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-}
-
-const downloadBackup = () => {
+const downloadBackup = async () => {
   backupLoading.value = true
-  download('/api/backup')
-  setTimeout(() => (backupLoading.value = false), 800)
+  try {
+    // 必须带登录 Token 请求（<a href> 直链不会携带，会被后端 401 拒绝）
+    await downloadFile('/backup', `backup-${Date.now()}.zip`)
+  } catch {
+    // 401 / 网络错误已由 request.ts 统一提示
+  } finally {
+    backupLoading.value = false
+  }
 }
 
-const downloadStudents = () => download('/api/students/export')
+const downloadStudents = () =>
+  downloadFile('/students/export', `students-${Date.now()}.json`)
 
 const triggerRestore = () => restoreInput.value?.click()
 

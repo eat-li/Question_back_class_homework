@@ -3,6 +3,14 @@
     <div class="toolbar">
       <el-button link type="primary" :icon="ArrowLeft" @click="goBack">返回题库</el-button>
       <span class="title">{{ tagLabel }}</span>
+      <el-tooltip
+        v-if="tag !== '__empty__'"
+        content="重命名题库"
+        placement="top"
+        :show-after="400"
+      >
+        <el-icon class="toolbar-rename" @click="renameCurrentTag"><EditPen /></el-icon>
+      </el-tooltip>
       <span class="count">共 {{ total }} 题</span>
     </div>
 
@@ -40,14 +48,76 @@
       </div>
     </div>
 
+    <div class="sub-filters" :class="{ dragging: dragId !== null }">
+      <span class="sub-filters__label">二级知识点</span>
+      <span
+        class="sub-chip"
+        :class="{ active: subTag === '' }"
+        @click="selectSubTag('')"
+      >全部</span>
+      <span
+        v-for="s in subTags"
+        :key="s.name"
+        class="sub-chip"
+        :class="{ active: subTag === s.name }"
+        @click="selectSubTag(s.name)"
+        @dragover.prevent
+        @drop.prevent="onDropTo(s.name)"
+      >{{ s.name }}（{{ s.total }}）</span>
+      <span
+        class="sub-chip sub-chip--empty"
+        :class="{ active: subTag === '__empty__' }"
+        @click="selectSubTag('__empty__')"
+        @dragover.prevent
+        @drop.prevent="onDropTo(null)"
+      >未分类</span>
+      <span v-if="dragId !== null" class="sub-filters__drag-tip">
+        松开鼠标即可将题目归入该二级知识点
+      </span>
+      <span v-else-if="!subTags.length" class="sub-filters__drag-tip">
+        暂无二级知识点——可直接在题目行「二级知识点」下拉框输入名称新建
+      </span>
+    </div>
+
     <el-table :data="list" border stripe v-loading="loading">
-      <el-table-column label="题干" show-overflow-tooltip min-width="240">
-        <template #default="{ row }">{{ stripHtml(row.title) }}</template>
+      <el-table-column label="归类" width="64" align="center">
+        <template #default="{ row }">
+          <span
+            class="drag-handle"
+            draggable="true"
+            :title="subTags.length ? '按住拖拽到上方「二级知识点」处归类' : '可直接编辑下方下拉框归类'"
+            @dragstart="onDragStart($event, row)"
+            @dragend="onDragEnd"
+          >
+            <Rank />
+          </span>
+        </template>
+      </el-table-column>
+      <el-table-column label="题干" min-width="240">
+        <template #default="{ row }">
+          <RichContent class="q-preview" :html="row.title || ''" />
+        </template>
       </el-table-column>
       <el-table-column label="题型" width="100">
         <template #default="{ row }">{{ typeLabel(row.type) }}</template>
       </el-table-column>
       <el-table-column prop="difficulty" label="难度" width="80" />
+      <el-table-column label="二级知识点" width="190">
+        <template #default="{ row }">
+          <el-select
+            :model-value="row.knowledgeSubTag || ''"
+            size="small"
+            filterable
+            allow-create
+            default-first-option
+            clearable
+            placeholder="未分类"
+            @change="(v: any) => onSubTagEdit(row, v)"
+          >
+            <el-option v-for="s in subTags" :key="s.name" :label="s.name" :value="s.name" />
+          </el-select>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="180">
         <template #default="{ row }">
           <el-button size="small" :icon="Edit" @click="openEdit(row)">编辑</el-button>
@@ -72,15 +142,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { ArrowLeft, Download, Edit, Delete } from '@element-plus/icons-vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import { ArrowLeft, Download, Edit, Delete, Rank, EditPen } from '@element-plus/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getQuestions, deleteQuestion } from '../../api/question'
+import {
+  getQuestions,
+  getQuestionSubTags,
+  updateQuestion,
+  deleteQuestion,
+  renameQuestionTag
+} from '../../api/question'
 import QuestionFormDialog from '../../components/QuestionFormDialog.vue'
+import RichContent from '../../components/RichContent.vue'
 import type { Question } from '../../types'
 import { printHtml } from '../../utils/printHtml'
-import { questionTypeLabel as typeLabel, stripHtml, escapeHtml } from '../../utils/format'
+import { questionTypeLabel as typeLabel, escapeHtml } from '../../utils/format'
 
 const route = useRoute()
 const router = useRouter()
@@ -102,10 +179,81 @@ const showAnswer = ref(false)
 const showAnswerArea = ref(false)
 const answerAreaHeight = ref(100)
 
+// —— 二级知识点筛选 ——
+const subTag = ref('')
+const subTags = ref<{ name: string; total: number }[]>([])
+
+// 加载当前一级知识点下的二级知识点（带题量）
+const loadSubTags = async () => {
+  try {
+    subTags.value = await getQuestionSubTags(tag.value)
+  } catch {
+    subTags.value = []
+  }
+}
+
+// 从路由 ?sub= 初始化二级筛选（仅在进入页面/切换一级时调用）
+const applyRouteSub = () => {
+  const initSub = route.query.sub ? String(route.query.sub) : ''
+  subTag.value = initSub && subTags.value.some((s) => s.name === initSub) ? initSub : ''
+}
+
+// 点击芯片筛选（'' = 全部，'__empty__' = 未分类）
+const selectSubTag = (name: string) => {
+  subTag.value = name
+  search()
+}
+
+// —— 归类操作：拖拽投放 / 行内下拉直接编辑 ——
+const dragId = ref<number | null>(null)
+
+const assignSubTag = async (questionId: number, subName: string | null) => {
+  await updateQuestion(questionId, { knowledgeSubTag: subName })
+  ElMessage.success(subName ? `已归入「${subName}」` : '已移回未分类')
+  await Promise.all([loadSubTags(), load()])
+}
+
+const onDragStart = (e: DragEvent, row: any) => {
+  dragId.value = row.id
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', String(row.id))
+  }
+}
+
+const onDragEnd = () => {
+  dragId.value = null
+}
+
+// 拖到某个二级芯片上（null 表示拖到「未分类」，即清除归类）
+const onDropTo = async (subName: string | null) => {
+  const id = dragId.value
+  dragId.value = null
+  if (id == null) return
+  try {
+    await assignSubTag(id, subName)
+  } catch {
+    // 错误提示已由 request.ts 统一弹出
+  }
+}
+
+// 行内下拉直接编辑（可选已有二级，或输入新名称创建）
+const onSubTagEdit = async (row: any, value: any) => {
+  const name = value != null && String(value).trim() ? String(value).trim() : null
+  try {
+    await assignSubTag(row.id, name)
+  } catch {
+    // 错误提示已由 request.ts 统一弹出
+  }
+}
+
 // 生成知识点题目集 HTML（打印用）
 const buildQuestionsHtml = (questions: any[], withAnswer: boolean) => {
   const fs = 16
-  const title = `${tagLabel.value} · 题目集`
+  const subLabel = subTag.value === '__empty__' ? '未分类' : subTag.value
+  const title = subLabel
+    ? `${tagLabel.value} › ${subLabel} · 题目集`
+    : `${tagLabel.value} · 题目集`
   const renderOpts = (q: any) =>
     q.options && Array.isArray(q.options)
       ? `<div style="margin:6px 0 0 22px;">${q.options
@@ -143,14 +291,21 @@ const buildQuestionsHtml = (questions: any[], withAnswer: boolean) => {
   </div>`
 }
 
-// 导出该知识点全部题目为 PDF（打印方式）
+// 导出当前筛选下的全部题目为 PDF（打印方式）
 const doExport = async () => {
-  const all = await getQuestions({ knowledgeTag: tag.value })
+  const params: any = { knowledgeTag: tag.value }
+  if (subTag.value === '__empty__') params.knowledgeSubTag = '__empty__'
+  else if (subTag.value) params.knowledgeSubTag = subTag.value
+  const all = await getQuestions(params)
   if (!all.length) {
-    ElMessage.warning('该知识点下没有题目')
+    ElMessage.warning('当前筛选下没有题目')
     return
   }
-  const okFlag = printHtml(`${tagLabel.value} · 题目集`, buildQuestionsHtml(all, showAnswer.value))
+  const subLabel = subTag.value === '__empty__' ? '未分类' : subTag.value
+  const okFlag = printHtml(
+    `${subLabel ? tagLabel.value + ' › ' + subLabel : tagLabel.value} · 题目集`,
+    buildQuestionsHtml(all, showAnswer.value)
+  )
   if (!okFlag) ElMessage.warning('浏览器拦截了弹出窗口，请允许本站弹窗后再试')
 }
 
@@ -160,6 +315,8 @@ const load = async () => {
     const params: any = { knowledgeTag: tag.value, page: page.value, pageSize }
     if (type.value !== 'all') params.type = type.value
     if (difficulty.value != null) params.difficulty = difficulty.value
+    if (subTag.value === '__empty__') params.knowledgeSubTag = '__empty__'
+    else if (subTag.value) params.knowledgeSubTag = subTag.value
     const res = await getQuestions(params)
     list.value = res.list
     total.value = res.total
@@ -175,6 +332,32 @@ const search = () => {
 
 const goBack = () => router.push('/questions')
 
+// 重命名当前题库（一级知识点），成功后跳转到新名称的页面
+const renameCurrentTag = async () => {
+  if (tag.value === '__empty__') return
+  try {
+    const { value } = await ElMessageBox.prompt(
+      `重命名题库「${tagLabel.value}」（共 ${total.value} 道题）：`,
+      '重命名题库',
+      {
+        inputValue: tag.value,
+        inputPlaceholder: '新题库名称',
+        inputValidator: (v) => (v && v.trim() ? true : '名称不能为空'),
+        confirmButtonText: '确定',
+        cancelButtonText: '取消'
+      }
+    )
+    const to = value.trim()
+    if (!to || to === tag.value) return
+    await renameQuestionTag(tag.value, to)
+    ElMessage.success(`已重命名为「${to}」`)
+    router.replace(`/questions/knowledge/${encodeURIComponent(to)}`)
+  } catch (e: any) {
+    if (e === 'cancel' || e === 'close') return
+    // 其它错误已由 request.ts 统一提示
+  }
+}
+
 const openEdit = (row: any) => {
   editing.value = row
   editVisible.value = true
@@ -187,7 +370,22 @@ const remove = async (row: any) => {
   load()
 }
 
-onMounted(load)
+onMounted(async () => {
+  await loadSubTags()
+  applyRouteSub()
+  load()
+})
+
+// 在题库页切换一级知识点时（同路由实例复用）刷新数据与二级候选
+watch(
+  () => route.params.tag,
+  async () => {
+    subTag.value = ''
+    await loadSubTags()
+    applyRouteSub()
+    load()
+  }
+)
 </script>
 
 <style scoped>
@@ -207,11 +405,120 @@ onMounted(load)
   color: var(--ink-soft);
   font-size: 13px;
 }
+.toolbar-rename {
+  cursor: pointer;
+  color: var(--ink-soft);
+  font-size: 16px;
+  padding: 4px;
+  border-radius: 6px;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+.toolbar-rename:hover {
+  color: var(--moss-deep);
+  background: var(--moss-soft);
+}
+/* 题干预览：渲染富文本与 LaTeX 公式，最多两行，超出隐藏（完整内容见编辑弹窗） */
+.q-preview {
+  font-size: 13px;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.q-preview :deep(.katex-display) {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
 .filters {
   margin-bottom: 16px;
   display: flex;
   align-items: center;
   gap: 12px;
+}
+.sub-filters {
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.sub-filters__label {
+  font-size: 13px;
+  color: var(--ink-soft);
+  flex-shrink: 0;
+}
+.sub-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--ink-soft);
+  background: var(--paper-deep);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.sub-chip:hover {
+  border-color: var(--moss);
+  color: var(--moss-deep);
+}
+.sub-chip.active {
+  background: var(--moss);
+  border-color: var(--moss);
+  color: #fffdf9;
+  font-weight: 600;
+}
+.sub-chip--empty {
+  border-style: dashed;
+}
+/* 拖拽中：所有芯片显示为可投放目标，悬停高亮 */
+.sub-filters.dragging .sub-chip {
+  border-style: dashed;
+  border-color: var(--moss);
+}
+.sub-filters.dragging .sub-chip:hover {
+  background: var(--moss);
+  border-style: solid;
+  color: #fffdf9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(91, 125, 116, 0.3);
+}
+.sub-filters__drag-tip {
+  font-size: 12px;
+  color: var(--moss-deep);
+}
+/* 拖拽手柄 */
+.drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  color: var(--ink-soft);
+  font-size: 16px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+.drag-handle:hover {
+  color: var(--moss-deep);
+  background: var(--moss-soft);
+}
+.drag-handle:active {
+  cursor: grabbing;
 }
 .filters__actions {
   margin-left: auto;

@@ -19,6 +19,8 @@ const pick = (body = {}) => {
       body.difficulty === null || body.difficulty === '' ? null : Number(body.difficulty)
   if (body.knowledgeTag !== undefined)
     out.knowledgeTag = body.knowledgeTag ? String(body.knowledgeTag).slice(0, 100) : null
+  if (body.knowledgeSubTag !== undefined)
+    out.knowledgeSubTag = body.knowledgeSubTag ? String(body.knowledgeSubTag).slice(0, 100) : null
   if (body.body !== undefined) out.body = body.body ? String(body.body) : null
   if (body.options !== undefined) out.options = body.options
   if (body.answer !== undefined) out.answer = body.answer ? String(body.answer) : null
@@ -43,10 +45,10 @@ const validate = (payload, { partial = false } = {}) => {
   return null
 }
 
-// 列表（关键词/题型/难度/知识点检索，支持分页）
+// 列表（关键词/题型/难度/知识点/二级知识点检索，支持分页）
 exports.list = async (req, res, next) => {
   try {
-    const { keyword, type, difficulty, knowledgeTag, page, pageSize } = req.query
+    const { keyword, type, difficulty, knowledgeTag, knowledgeSubTag, page, pageSize } = req.query
     const where = {}
     if (keyword) where.title = { [Op.like]: `%${keyword}%` }
     if (type) where.type = type
@@ -56,6 +58,11 @@ exports.list = async (req, res, next) => {
       where.knowledgeTag = { [Op.or]: [null, ''] }
     } else if (knowledgeTag) {
       where.knowledgeTag = knowledgeTag
+    }
+    if (knowledgeSubTag === '__empty__') {
+      where.knowledgeSubTag = { [Op.or]: [null, ''] }
+    } else if (knowledgeSubTag) {
+      where.knowledgeSubTag = knowledgeSubTag
     }
 
     const order = [['id', 'DESC']]
@@ -80,7 +87,7 @@ exports.list = async (req, res, next) => {
   }
 }
 
-// 知识点卡片聚合：按知识点统计题目总数与各题型数量
+// 知识点卡片聚合：按一级知识点统计题目总数与各题型数量，并附带二级知识点分布
 exports.stats = async (req, res, next) => {
   try {
     const { keyword } = req.query
@@ -90,11 +97,12 @@ exports.stats = async (req, res, next) => {
     const rows = await Question.findAll({
       attributes: [
         'knowledgeTag',
+        'knowledgeSubTag',
         'type',
         [Question.sequelize.fn('COUNT', Question.sequelize.col('id')), 'count']
       ],
       where,
-      group: ['knowledgeTag', 'type'],
+      group: ['knowledgeTag', 'knowledgeSubTag', 'type'],
       raw: true
     })
 
@@ -108,7 +116,8 @@ exports.stats = async (req, res, next) => {
           total: 0,
           choice: 0,
           fill: 0,
-          solve: 0
+          solve: 0,
+          subTags: []
         })
       }
       const item = map.get(rawTag)
@@ -117,10 +126,51 @@ exports.stats = async (req, res, next) => {
       if (r.type === 'choice') item.choice += count
       else if (r.type === 'fill') item.fill += count
       else if (r.type === 'solve') item.solve += count
+
+      // 二级知识点分布（仅统计有值的）
+      if (r.knowledgeSubTag) {
+        const sub = item.subTags.find((s) => s.name === r.knowledgeSubTag)
+        if (sub) sub.total += count
+        else item.subTags.push({ name: r.knowledgeSubTag, total: count })
+      }
+    }
+
+    for (const item of map.values()) {
+      item.subTags.sort((a, b) => b.total - a.total)
     }
 
     const stats = [...map.values()].sort((a, b) => b.total - a.total)
     ok(res, stats)
+  } catch (e) {
+    next(e)
+  }
+}
+
+// 某一级知识点下的二级知识点列表（带题量，供筛选与级联下拉使用）
+exports.subTags = async (req, res, next) => {
+  try {
+    const { knowledgeTag } = req.query
+    const where = { knowledgeSubTag: { [Op.ne]: null, [Op.ne]: '' } }
+    if (knowledgeTag === '__empty__') {
+      where.knowledgeTag = { [Op.or]: [null, ''] }
+    } else if (knowledgeTag) {
+      where.knowledgeTag = knowledgeTag
+    } else {
+      // 未指定一级知识点：统计全部二级知识点（一般不会用到）
+    }
+
+    const rows = await Question.findAll({
+      attributes: [
+        'knowledgeSubTag',
+        [Question.sequelize.fn('COUNT', Question.sequelize.col('id')), 'count']
+      ],
+      where,
+      group: ['knowledgeSubTag'],
+      order: [[Question.sequelize.fn('COUNT', Question.sequelize.col('id')), 'DESC']],
+      raw: true
+    })
+    const subs = rows.map((r) => ({ name: r.knowledgeSubTag, total: Number(r.count) || 0 }))
+    ok(res, subs)
   } catch (e) {
     next(e)
   }
@@ -201,6 +251,30 @@ exports.remove = async (req, res, next) => {
     cacheDel('questions:tags')
     cacheDel('stats:overview')
     ok(res, null, '删除成功')
+  } catch (e) {
+    next(e)
+  }
+}
+
+// 重命名一级知识点（题库名）：把该知识点下所有题目的 knowledgeTag 更新为新名称。
+// 二级知识点（knowledgeSubTag）随题目一起保留，不做改动。
+exports.renameTag = async (req, res, next) => {
+  try {
+    const { from, to } = req.body || {}
+    const fromName = from == null ? '' : String(from).trim()
+    const toName = to == null ? '' : String(to).trim()
+    if (!fromName) return fail(res, 40000, '原知识点名称不能为空')
+    if (!toName) return fail(res, 40000, '新知识点名称不能为空')
+    if (toName.length > 100) return fail(res, 40000, '知识点名称不能超过 100 字')
+    if (fromName === toName) return ok(res, { updated: 0 }, '名称未变化')
+
+    const [affectedCount] = await Question.update(
+      { knowledgeTag: toName },
+      { where: { knowledgeTag: fromName } }
+    )
+    cacheDel('questions:tags')
+    cacheDel('stats:overview')
+    ok(res, { updated: affectedCount }, `已更新 ${affectedCount} 道题目`)
   } catch (e) {
     next(e)
   }

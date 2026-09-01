@@ -98,34 +98,74 @@
         <el-option label="填空题" value="fill" />
         <el-option label="解答题" value="solve" />
       </el-select>
+      <el-select
+        v-model="qKnowledgeTag"
+        placeholder="知识点"
+        clearable
+        filterable
+        style="width: 140px"
+        @change="onPrimaryKnowledgeChange"
+      >
+        <el-option v-for="t in qKnowledgeOptions" :key="t" :label="t" :value="t" />
+      </el-select>
+      <el-select
+        v-model="qKnowledgeSubTag"
+        placeholder="二级知识点"
+        clearable
+        filterable
+        style="width: 140px"
+        :disabled="!qKnowledgeTag"
+        @change="qSearch"
+      >
+        <el-option v-for="t in qSubKnowledgeOptions" :key="t" :label="t" :value="t" />
+      </el-select>
       <el-button type="primary" @click="qSearch">查询</el-button>
+      <span class="picker-hint">点击整行即可选中 / 取消</span>
       <span class="picked-count">已选 {{ pickedIds.length }} 题</span>
+      <el-button v-if="pickedIds.length" size="small" @click="clearPicked">清空已选</el-button>
     </div>
 
-    <el-table :data="questions" border stripe v-loading="qLoading" @row-click="onRowClick">
-      <el-table-column label="选择" width="60">
+    <el-table
+      :data="questions"
+      border
+      stripe
+      v-loading="qLoading"
+      @row-click="onRowClick"
+      :row-class-name="rowClassName"
+    >
+      <el-table-column label="选择" width="70">
         <template #default="{ row }">
           <el-checkbox
             v-if="pickMode === 'multi'"
+            class="pick-check"
             :model-value="isPicked(row.id)"
+            @click.stop
             @change="(v: boolean) => togglePick(row.id, v)"
           />
           <el-radio
             v-else
+            class="pick-check"
             :model-value="pickedIds[0]"
             :value="row.id"
+            @click.stop
             @change="() => pickSingle(row.id)"
           />
         </template>
       </el-table-column>
-      <el-table-column label="题干" show-overflow-tooltip min-width="220">
-        <template #default="{ row }">{{ stripHtml(row.title) }}</template>
+      <el-table-column label="题干" min-width="220">
+        <template #default="{ row }">
+          <RichContent class="q-cell-preview" :html="row.title || ''" />
+        </template>
       </el-table-column>
       <el-table-column label="题型" width="90">
         <template #default="{ row }">{{ typeLabel(row.type) }}</template>
       </el-table-column>
       <el-table-column prop="difficulty" label="难度" width="70" />
-      <el-table-column prop="knowledgeTag" label="知识点" width="130" />
+      <el-table-column label="知识点" width="170">
+        <template #default="{ row }">
+          {{ row.knowledgeTag || '—' }}{{ row.knowledgeSubTag ? ' › ' + row.knowledgeSubTag : '' }}
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="100">
         <template #default="{ row }">
           <el-button size="small" link type="primary" @click.stop="showDetail(row)"
@@ -196,7 +236,7 @@
         <el-descriptions-item label="难度">{{ currentQuestion.difficulty }}</el-descriptions-item>
         <el-descriptions-item label="知识点">{{
           currentQuestion.knowledgeTag || '—'
-        }}</el-descriptions-item>
+        }}{{ currentQuestion.knowledgeSubTag ? ' › ' + currentQuestion.knowledgeSubTag : '' }}</el-descriptions-item>
       </el-descriptions>
       <div v-if="currentQuestion.options" class="q-section">
         <div class="q-label">选项</div>
@@ -214,7 +254,7 @@
       </div>
       <div v-if="currentQuestion.answer" class="q-section">
         <div class="q-label">答案</div>
-        <div class="q-text">{{ currentQuestion.answer }}</div>
+        <RichContent :html="currentQuestion.answer" />
       </div>
       <div v-if="currentQuestion.analysis" class="q-section">
         <div class="q-label">解析</div>
@@ -316,7 +356,7 @@ import {
   deleteHomework,
   saveHomeworkScores
 } from '../../api/homework'
-import { getQuestions } from '../../api/question'
+import { getQuestions, getQuestionTags, getQuestionSubTags } from '../../api/question'
 import { getStudents } from '../../api/student'
 import renderMathInElement from 'katex/contrib/auto-render'
 import RichContent from '../../components/RichContent.vue'
@@ -345,6 +385,10 @@ const pickMode = ref('multi') // multi | single
 const pickedIds = ref<number[]>([])
 const qKeyword = ref('')
 const qType = ref('')
+const qKnowledgeTag = ref('')
+const qKnowledgeOptions = ref<string[]>([])
+const qKnowledgeSubTag = ref('')
+const qSubKnowledgeOptions = ref<string[]>([])
 const qLoading = ref(false)
 const qPage = ref(1)
 const qPageSize = 10
@@ -394,16 +438,6 @@ const isExpired = (d: any) => {
   return date.getTime() < Date.now()
 }
 
-// 富文本 HTML 转纯文本，用于列表显示
-const stripHtml = (html: string) =>
-  (html || '')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-
 const load = async () => {
   loading.value = true
   try {
@@ -424,7 +458,31 @@ const openCreate = () => {
   pickedIds.value = []
   qKeyword.value = ''
   qType.value = ''
+  qKnowledgeTag.value = ''
+  qKnowledgeSubTag.value = ''
+  qSubKnowledgeOptions.value = []
   createVisible.value = true
+}
+
+// 按当前一级知识点加载二级候选
+const loadSubKnowledgeOptions = async () => {
+  if (!qKnowledgeTag.value) {
+    qSubKnowledgeOptions.value = []
+    return
+  }
+  try {
+    const subs = await getQuestionSubTags(qKnowledgeTag.value)
+    qSubKnowledgeOptions.value = subs.map((s) => s.name)
+  } catch {
+    qSubKnowledgeOptions.value = []
+  }
+}
+
+// 一级知识点变化：清空已选二级，刷新二级候选并重新查询
+const onPrimaryKnowledgeChange = async () => {
+  qKnowledgeSubTag.value = ''
+  await loadSubKnowledgeOptions()
+  qSearch()
 }
 
 // 加载题目列表（抽题框内搜索/筛选）
@@ -437,6 +495,8 @@ const loadQuestions = async () => {
       page: qPage.value,
       pageSize: qPageSize
     }
+    if (qKnowledgeTag.value) params.knowledgeTag = qKnowledgeTag.value
+    if (qKnowledgeSubTag.value) params.knowledgeSubTag = qKnowledgeSubTag.value
     const res = await getQuestions(params)
     questions.value = res.list
     qTotal.value = res.total
@@ -454,6 +514,9 @@ const qSearch = () => {
 const openPicker = async () => {
   pickedIds.value = [...(form.questionIds || [])]
   qPage.value = 1
+  // 每次打开刷新知识点选项，题库新增知识点后可立即筛选
+  qKnowledgeOptions.value = await getQuestionTags().catch(() => [])
+  await loadSubKnowledgeOptions()
   await loadQuestions()
   drawerVisible.value = true
 }
@@ -477,9 +540,18 @@ const pickSingle = (id: number) => {
   pickedIds.value = [id]
 }
 
-// 单选模式点击整行即选中
+// 单选/多选：点击整行即可选中/取消（多选模式点行切换，单选模式点行即选中）
 const onRowClick = (row: any) => {
   if (pickMode.value === 'single') pickSingle(row.id)
+  else togglePick(row.id, !isPicked(row.id))
+}
+
+// 已选行高亮
+const rowClassName = ({ row }: { row: any }) => (isPicked(row.id) ? 'row-picked' : '')
+
+// 清空已选
+const clearPicked = () => {
+  pickedIds.value = []
 }
 
 // 确认抽题
@@ -613,7 +685,7 @@ const buildHomeworkHtml = () => {
         <div style="margin-bottom:4px;">
           <span style="font-weight:700;">${no}.</span>
           ${layout.showType ? `<span style="color:#999;font-size:${fs - 2}px;margin-left:6px;">【${escapeHtml(typeLabel(q.type))}】</span>` : ''}
-          ${layout.showKnowledge && q.knowledgeTag ? `<span style="color:#999;font-size:${fs - 2}px;margin-left:6px;">${escapeHtml(q.knowledgeTag)}</span>` : ''}
+          ${layout.showKnowledge && q.knowledgeTag ? `<span style="color:#999;font-size:${fs - 2}px;margin-left:6px;">${escapeHtml(q.knowledgeTag)}${q.knowledgeSubTag ? ' › ' + escapeHtml(q.knowledgeSubTag) : ''}</span>` : ''}
           ${layout.showScore ? `<span style="float:right;color:#666;">（${layout.scorePerQuestion} 分）</span>` : ''}
         </div>
         <div>${q.title || ''}</div>
@@ -759,11 +831,42 @@ onMounted(load)
   color: var(--ink-soft);
   font-size: 13px;
 }
+/* 抽题列表题干预览：渲染富文本与 LaTeX 公式，最多两行，超出隐藏（完整内容见详情弹窗） */
+.q-cell-preview {
+  font-size: 13px;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.q-cell-preview :deep(.katex-display) {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
 .picker-toolbar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 16px;
+}
+.picker-hint {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+/* 抽题表格：整行可点击 */
+:deep(.el-table__body tr) {
+  cursor: pointer;
+}
+/* 已选行高亮（含 hover 时保持） */
+:deep(.el-table .row-picked),
+:deep(.el-table .row-picked:hover > td.el-table__cell) {
+  background: var(--moss-soft) !important;
+}
+/* 放大选择框，便于点击 */
+.pick-check {
+  transform: scale(1.35);
 }
 .q-title {
   font-size: 16px;

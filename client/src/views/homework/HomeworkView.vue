@@ -45,7 +45,7 @@
             <el-tag size="small" type="info">{{ typeLabel(q.type) }}</el-tag>
             <el-tag v-if="q.knowledgeTag" size="small" type="warning" class="hw-q__tag">{{
               q.knowledgeTag
-            }}</el-tag>
+            }}{{ q.knowledgeSubTag ? ' › ' + q.knowledgeSubTag : '' }}</el-tag>
           </div>
           <div class="hw-q__title"><RichContent :html="q.title" /></div>
           <div v-if="q.options && q.options.length" class="hw-q__opts">
@@ -125,7 +125,7 @@ onMounted(load)
   color: var(--ink);
 }
 .toolbar-count {
-  color: #909399;
+  color: var(--ink-soft);
   font-size: 13px;
 }
 .end-at--expired {
@@ -146,7 +146,7 @@ onMounted(load)
 .hw-view__meta {
   display: flex;
   gap: 16px;
-  color: #909399;
+  color: var(--ink-soft);
   font-size: 13px;
 }
 .hw-q {

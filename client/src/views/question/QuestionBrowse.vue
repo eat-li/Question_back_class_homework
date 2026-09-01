@@ -24,8 +24,19 @@
           clearable
           filterable
           style="width: 180px"
+          @change="onPrimaryTagChange"
         >
           <el-option v-for="t in tags" :key="t" :label="t" :value="t" />
+        </el-select>
+        <el-select
+          v-model="subTag"
+          placeholder="全部二级知识点"
+          clearable
+          filterable
+          style="width: 160px"
+          :disabled="!knowledgeTag"
+        >
+          <el-option v-for="t in subTagOptions" :key="t" :label="t" :value="t" />
         </el-select>
         <el-button type="primary" :icon="Search" @click="search">查询</el-button>
         <el-button :icon="RefreshLeft" @click="reset">重置</el-button>
@@ -45,6 +56,9 @@
             {{ '★'.repeat(q.difficulty || 0) || '—' }}
           </span>
           <span v-if="q.knowledgeTag" class="q-tag">{{ q.knowledgeTag }}</span>
+          <span v-if="q.knowledgeSubTag" class="q-tag q-tag--sub">{{
+            q.knowledgeSubTag
+          }}</span>
         </div>
 
         <div class="q-title" @click="onContentClick"><RichContent :html="q.title || ''" /></div>
@@ -97,7 +111,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { Search, RefreshLeft } from '@element-plus/icons-vue'
-import { getQuestions, getQuestionTags } from '../../api/question'
+import { getQuestions, getQuestionTags, getQuestionSubTags } from '../../api/question'
 import RichContent from '../../components/RichContent.vue'
 import type { Question } from '../../types'
 
@@ -116,6 +130,21 @@ const keyword = ref('')
 const type = ref('')
 const difficulty = ref<number | ''>('')
 const knowledgeTag = ref('')
+const subTag = ref('')
+const subTagOptions = ref<string[]>([])
+
+// 一级知识点变化：清空二级并刷新二级候选
+const onPrimaryTagChange = async () => {
+  subTag.value = ''
+  subTagOptions.value = []
+  if (!knowledgeTag.value) return
+  try {
+    const subs = await getQuestionSubTags(knowledgeTag.value)
+    subTagOptions.value = subs.map((s) => s.name)
+  } catch {
+    subTagOptions.value = []
+  }
+}
 
 // 分页
 const page = ref(1)
@@ -156,6 +185,7 @@ const load = async () => {
     if (type.value) params.type = type.value
     if (difficulty.value) params.difficulty = difficulty.value
     if (knowledgeTag.value) params.knowledgeTag = knowledgeTag.value
+    if (subTag.value) params.knowledgeSubTag = subTag.value
     const res = await getQuestions(params)
     list.value = res.list
     total.value = res.total
@@ -175,6 +205,8 @@ const reset = () => {
   type.value = ''
   difficulty.value = ''
   knowledgeTag.value = ''
+  subTag.value = ''
+  subTagOptions.value = []
   search()
 }
 
@@ -278,6 +310,10 @@ onMounted(() => {
   background: var(--paper-deep);
   padding: 2px 10px;
   border-radius: 999px;
+}
+.q-tag--sub {
+  color: var(--moss-deep);
+  background: var(--moss-soft);
 }
 
 .q-title {

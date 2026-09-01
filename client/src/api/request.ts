@@ -60,4 +60,50 @@ request.interceptors.response.use(
   }
 )
 
+// 文件下载专用实例：携带登录 Token，但不做 JSON 解包（下载接口返回的是文件流）
+const downloadRequest = axios.create({ baseURL: '/api', timeout: 60000 })
+
+downloadRequest.interceptors.request.use((config) => {
+  const token = localStorage.getItem(TOKEN_KEY)
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+downloadRequest.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem(TOKEN_KEY)
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
+    }
+    return Promise.reject(err)
+  }
+)
+
+// 带认证的文件下载：直接用 <a href> 打开接口地址不会携带 Authorization 头，
+// 会被后端 401 拒绝；这里先经 axios 携带 Token 拿到文件流，再触发浏览器下载。
+export async function downloadFile(url: string, fallbackName = 'download'): Promise<void> {
+  const res = await downloadRequest.get<Blob>(url, { responseType: 'blob' })
+  const disposition = res.headers['content-disposition'] || ''
+  const match = /filename="?([^";]+)"?/.exec(disposition)
+  let filename = match?.[1] || fallbackName
+  try {
+    filename = decodeURIComponent(filename)
+  } catch {
+    // 文件名含非法的 % 编码时保持原样
+  }
+  const blobUrl = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = blobUrl
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(blobUrl)
+}
+
 export default request

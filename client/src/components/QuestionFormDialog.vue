@@ -20,18 +20,35 @@
       <el-form-item label="难度">
         <el-input-number v-model="form.difficulty" :min="1" :max="5" />
       </el-form-item>
-      <el-form-item label="知识点">
+      <el-form-item label="一级知识点">
         <el-select
           v-model="form.knowledgeTag"
           filterable
           allow-create
           default-first-option
           clearable
-          placeholder="选择或输入知识点"
+          placeholder="选择或输入一级知识点"
           style="width: 100%"
+          @change="onPrimaryTagChange"
         >
           <el-option v-for="t in knowledgeOptions" :key="t" :label="t" :value="t" />
         </el-select>
+      </el-form-item>
+      <el-form-item label="二级知识点">
+        <el-select
+          v-model="form.knowledgeSubTag"
+          filterable
+          allow-create
+          default-first-option
+          clearable
+          placeholder="选择或输入二级知识点（可选）"
+          style="width: 100%"
+          :disabled="!form.knowledgeTag"
+          @change="loadSubTags"
+        >
+          <el-option v-for="t in subKnowledgeOptions" :key="t" :label="t" :value="t" />
+        </el-select>
+        <div class="form-tip">二级知识点归属于某个一级知识点，直接输入新名称即可新增；一级为空时不可选。</div>
       </el-form-item>
       <el-form-item label="补充说明">
         <RichEditor v-model="form.body" />
@@ -50,7 +67,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getQuestionTags, createQuestion, updateQuestion } from '../api/question'
+import { getQuestionTags, getQuestionSubTags, createQuestion, updateQuestion } from '../api/question'
 import RichEditor from './RichEditor.vue'
 
 const props = defineProps<{ modelValue: boolean; question?: any }>()
@@ -76,6 +93,27 @@ const knowledgePresets = [
   '集合与逻辑'
 ]
 const knowledgeOptions = ref<string[]>([...knowledgePresets])
+const subKnowledgeOptions = ref<string[]>([])
+
+// 按当前一级知识点加载其下已有的二级知识点
+const loadSubTags = async () => {
+  if (!form.knowledgeTag) {
+    subKnowledgeOptions.value = []
+    return
+  }
+  try {
+    const subs = await getQuestionSubTags(form.knowledgeTag)
+    subKnowledgeOptions.value = subs.map((s) => s.name)
+  } catch {
+    subKnowledgeOptions.value = []
+  }
+}
+
+// 一级知识点变化：清空已选二级，并刷新二级候选
+const onPrimaryTagChange = async () => {
+  form.knowledgeSubTag = null
+  await loadSubTags()
+}
 
 const stripHtml = (html: string) =>
   (html || '')
@@ -92,6 +130,8 @@ const initForm = () => {
   form.difficulty = 3
   form.type = 'choice'
   if (props.question) Object.assign(form, props.question)
+  // 编辑时按已有的一级知识点加载二级候选
+  loadSubTags()
 }
 
 watch(
@@ -130,3 +170,12 @@ const loadTags = async () => {
 
 onMounted(loadTags)
 </script>
+
+<style scoped>
+.form-tip {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  margin-top: 4px;
+}
+</style>

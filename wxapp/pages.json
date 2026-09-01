@@ -1,18 +1,25 @@
 {
   "pages": [
-    //pages数组中第一项表示应用启动页，参考：https://uniapp.dcloud.io/collocation/pages
     {
-      "path": "pages/index/index",
+      "path": "pages/bank/list",
       "style": {
-        "navigationBarTitleText": "教师辅助家长端"
+        "navigationBarTitleText": "题库",
+        "enablePullDownRefresh": true
+      }
+    },
+    {
+      "path": "pages/bank/detail",
+      "style": {
+        "navigationBarTitleText": "题目详情"
       }
     }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "教师辅助家长端",
-    "navigationBarBackgroundColor": "#F8F8F8",
-    "backgroundColor": "#F8F8F8"
+    "navigationBarTitleText": "题库",
+    "navigationBarBackgroundColor": "#FFFFFF",
+    "backgroundColor": "#F5F6F8",
+    "backgroundTextStyle": "dark"
   },
   "uniIdRouter": {}
 }

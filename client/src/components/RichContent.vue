@@ -38,7 +38,7 @@ watch(
 <style scoped>
 .rich-content {
   line-height: 1.7;
-  color: #303133;
+  color: var(--ink);
   word-break: break-word;
 }
 .rich-content :deep(img) {

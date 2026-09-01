@@ -6,6 +6,7 @@ export interface QuestionQuery {
   type?: string
   difficulty?: number
   knowledgeTag?: string
+  knowledgeSubTag?: string
   page?: number
   pageSize?: number
 }
@@ -21,6 +22,12 @@ export function getQuestions(params?: QuestionQuery): Promise<Question[] | PageR
 export const getQuestionStats = (params?: { keyword?: string }): Promise<QuestionStats[]> =>
   request.get('/questions/stats', { params })
 export const getQuestionTags = (): Promise<string[]> => request.get('/questions/tags')
+export const getQuestionSubTags = (
+  knowledgeTag?: string
+): Promise<{ name: string; total: number }[]> =>
+  request.get('/questions/subtags', { params: knowledgeTag ? { knowledgeTag } : undefined })
+export const renameQuestionTag = (from: string, to: string): Promise<{ updated: number }> =>
+  request.patch('/questions/rename-tag', { from, to })
 export const createQuestion = (data: Partial<Question>) => request.post('/questions', data)
 export const updateQuestion = (id: number, data: Partial<Question>) =>
   request.patch(`/questions/${id}`, data)

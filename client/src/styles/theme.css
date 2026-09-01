@@ -113,6 +113,11 @@ body {
   transition: box-shadow 0.2s ease;
 }
 
+/* 空态描述文字使用次级色 */
+.el-empty__description p {
+  color: var(--ink-soft);
+}
+
 /* KaTeX 公式：默认 nowrap 会让超长公式横向溢出，这里放开换行，块级公式再加横向滚动兜底 */
 .katex {
   white-space: normal;
@@ -146,4 +151,16 @@ body {
 }
 ::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* 用户系统开启「减少动态效果」时，关闭装饰性动画与过渡 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

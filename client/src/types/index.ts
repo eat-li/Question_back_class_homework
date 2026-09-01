@@ -24,6 +24,7 @@ export interface Question {
   type: QuestionType
   difficulty: number
   knowledgeTag?: string | null
+  knowledgeSubTag?: string | null
   body?: string | null
   options?: any[] | null
   answer?: string | null
@@ -38,6 +39,7 @@ export interface QuestionStats {
   choice: number
   fill: number
   solve: number
+  subTags?: { name: string; total: number }[]
 }
 
 export type HomeworkStatus = 'draft' | 'published' | 'closed'
