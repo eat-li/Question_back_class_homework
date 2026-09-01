@@ -490,6 +490,9 @@ const applyAiResult = () => {
   aiApplying.value = true
   try {
     editor.value?.commands.setContent(sanitizeHtml(aiDialog.rawHtml), false)
+    // ⚠️ setContent 默认 emitUpdate=false，不会触发 onUpdate → v-model 不更新，
+    // 保存时会提交排版前的内容。必须手动把新内容同步给父组件（form.title）。
+    emit('update:modelValue', editor.value?.getHTML() || '')
     ElMessage.success('已应用排版结果')
     aiDialog.visible = false
   } finally {
