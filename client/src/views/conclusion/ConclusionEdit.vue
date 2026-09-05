@@ -61,8 +61,22 @@
       <div class="edit-actions">
         <el-button @click="goBack">取消</el-button>
         <el-button :icon="View" @click="previewVisible = true">预览</el-button>
-        <el-button type="warning" plain @click="save('draft')">保存草稿</el-button>
-        <el-button type="primary" :icon="Check" @click="save('published')">发布</el-button>
+        <el-button
+          type="warning"
+          plain
+          :loading="saving === 'draft'"
+          :disabled="saving !== null"
+          @click="save('draft')"
+          >保存草稿</el-button
+        >
+        <el-button
+          type="primary"
+          :icon="Check"
+          :loading="saving === 'published'"
+          :disabled="saving !== null"
+          @click="save('published')"
+          >发布</el-button
+        >
       </div>
     </el-card>
 
@@ -76,9 +90,9 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ArrowLeft, Check, View } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { getConclusion, createConclusion, updateConclusion } from '../../api/conclusion'
 import { getCategories } from '../../api/category'
 import RichEditor from '../../components/RichEditor.vue'
@@ -110,8 +124,15 @@ const cascaderProps = {
   emitPath: true
 }
 const statusLabel = ref('')
+const originalStatus = ref('draft') // 编辑加载时原始状态，用于「保存草稿撤下已发布」保护
 
 const previewVisible = ref(false)
+
+// —— 保存防连点 + 未保存离开守卫 ——
+const saving = ref<'draft' | 'published' | null>(null)
+let pristine = '' // 表单初始快照，用于判断是否有未保存修改
+const snapshotForm = () => JSON.stringify({ f: { ...form }, c: categoryPath.value })
+const isDirty = () => snapshotForm() !== pristine
 
 // 把后端树形结构转为 el-cascader options（去掉空 children，避免叶子仍显示展开箭头）
 const toCascaderOptions = (nodes: any[]): any[] =>
@@ -148,11 +169,13 @@ const load = async () => {
   form.content = data.content || ''
   form.summary = data.summary || ''
   form.tags = data.tags || ''
-  statusLabel.value = data.status === 'published' ? '已发布' : '草稿'
+  originalStatus.value = data.status || 'draft'
+  statusLabel.value = originalStatus.value === 'published' ? '已发布' : '草稿'
   categoryPath.value = findPath(tree, data.categoryId) || []
 }
 
 const save = async (status: 'draft' | 'published') => {
+  if (saving.value) return
   if (!form.title.trim()) {
     ElMessage.warning('请填写标题')
     return
@@ -172,6 +195,18 @@ const save = async (status: 'draft' | 'published') => {
     ElMessage.warning('请填写详细内容')
     return
   }
+  // 已发布结论「保存草稿」会把它撤下（不再可见），需显式确认
+  if (isEdit.value && status === 'draft' && originalStatus.value === 'published') {
+    try {
+      await ElMessageBox.confirm(
+        '该结论当前为「已发布」状态，保存草稿会将其撤下（列表中不再显示为已发布）。确定继续？',
+        '撤下已发布内容',
+        { type: 'warning', confirmButtonText: '仍要存为草稿', cancelButtonText: '取消' }
+      )
+    } catch {
+      return
+    }
+  }
   const payload = {
     title: form.title.trim(),
     categoryId,
@@ -180,19 +215,47 @@ const save = async (status: 'draft' | 'published') => {
     tags: form.tags || null,
     status
   }
-  if (isEdit.value) {
-    await updateConclusion(id.value!, payload)
-  } else {
-    await createConclusion(payload)
+  saving.value = status
+  try {
+    if (isEdit.value) {
+      await updateConclusion(id.value!, payload)
+      originalStatus.value = status
+    } else {
+      await createConclusion(payload)
+    }
+    ElMessage.success(status === 'published' ? '已发布' : '已保存草稿')
+    pristine = snapshotForm() // 保存成功，视为已同步，离开不再拦截
+    router.push('/conclusions')
+  } catch (err) {
+    // 错误提示已由 request.ts 全局弹出
+    console.error('保存失败', err)
+  } finally {
+    saving.value = null
   }
-  ElMessage.success(status === 'published' ? '已发布' : '已保存草稿')
-  router.push('/conclusions')
 }
+
+// 未保存修改离开守卫：返回/切换路由前提示
+onBeforeRouteLeave(async () => {
+  if (!isDirty()) return true
+  try {
+    await ElMessageBox.confirm('当前有未保存的修改，确定离开？（内容不会被自动保存）', '未保存提示', {
+      type: 'warning',
+      confirmButtonText: '放弃修改并离开',
+      cancelButtonText: '继续编辑'
+    })
+    return true
+  } catch {
+    return false
+  }
+})
 
 const goBack = () => router.push('/conclusions')
 const goCategories = () => router.push('/conclusions/categories')
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  pristine = snapshotForm() // 记录初始快照（新建=空表单；编辑=已加载内容）
+})
 </script>
 
 <style scoped>

@@ -138,7 +138,7 @@
     </div>
   </el-card>
 
-  <QuestionFormDialog v-model="editVisible" :question="editing" @saved="load" />
+  <QuestionFormDialog v-model="editVisible" :question="editing" @saved="onEditedSaved" />
 </template>
 
 <script setup lang="ts">
@@ -363,11 +363,28 @@ const openEdit = (row: any) => {
   editVisible.value = true
 }
 
+// 编辑保存后：刷新列表 + 二级知识点计数（题目可能改了知识点归属）
+const onEditedSaved = async () => {
+  await Promise.all([load(), loadSubTags()])
+}
+
 const remove = async (row: any) => {
-  await ElMessageBox.confirm('确定删除该题目？', '提示', { type: 'warning' })
-  await deleteQuestion(row.id)
-  ElMessage.success('删除成功')
-  load()
+  try {
+    await ElMessageBox.confirm(`确定删除该题目？`, '提示', { type: 'warning' })
+  } catch {
+    return // 用户取消
+  }
+  try {
+    await deleteQuestion(row.id)
+    ElMessage.success('删除成功')
+    // 删除末页最后一条时回退页码，避免停留在空白页
+    if (page.value > 1 && list.value.length <= 1) page.value -= 1
+    // 同步刷新列表与顶部二级知识点题量计数
+    await Promise.all([load(), loadSubTags()])
+  } catch (err) {
+    // 错误提示已由 request.ts 全局弹出
+    console.error('删除失败', err)
+  }
 }
 
 onMounted(async () => {

@@ -45,7 +45,9 @@
         文件；下次（或换电脑后）直接导入即可恢复。导入时按「姓名」判断，已存在的学生会被更新。
       </p>
       <div class="actions">
-        <el-button :icon="Download" @click="downloadStudents">导出学生 JSON</el-button>
+        <el-button :icon="Download" :loading="exporting" @click="downloadStudents"
+          >导出学生 JSON</el-button
+        >
         <el-button type="primary" :icon="Upload" :loading="importing" @click="triggerImport"
           >导入学生 JSON</el-button
         >
@@ -64,12 +66,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Download, Upload } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { importStudents } from '../../api/student'
 import { restoreBackup } from '../../api/backup'
 import { downloadFile } from '../../api/request'
 
 const backupLoading = ref(false)
+const exporting = ref(false)
 const importing = ref(false)
 const restoring = ref(false)
 const fileInput = ref<HTMLInputElement>()
@@ -81,14 +84,22 @@ const downloadBackup = async () => {
     // 必须带登录 Token 请求（<a href> 直链不会携带，会被后端 401 拒绝）
     await downloadFile('/backup', `backup-${Date.now()}.zip`)
   } catch {
-    // 401 / 网络错误已由 request.ts 统一提示
+    // 401 跳登录；其它错误已在 downloadFile 内提示
   } finally {
     backupLoading.value = false
   }
 }
 
-const downloadStudents = () =>
-  downloadFile('/students/export', `students-${Date.now()}.json`)
+const downloadStudents = async () => {
+  exporting.value = true
+  try {
+    await downloadFile('/students/export', `students-${Date.now()}.json`)
+  } catch {
+    // 401 跳登录；其它错误已在 downloadFile 内提示
+  } finally {
+    exporting.value = false
+  }
+}
 
 const triggerRestore = () => restoreInput.value?.click()
 
@@ -96,6 +107,17 @@ const onRestoreFile = async (e: Event) => {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
+  // 高危覆盖写操作：先二次确认，再执行
+  try {
+    await ElMessageBox.confirm(
+      `确定用「${file.name}」恢复数据？恢复会按主键插入或更新现有记录，可能覆盖当前数据。`,
+      '恢复备份确认',
+      { type: 'warning', confirmButtonText: '确认恢复', cancelButtonText: '取消' }
+    )
+  } catch {
+    input.value = ''
+    return
+  }
   restoring.value = true
   try {
     const res = await restoreBackup(file)
@@ -115,6 +137,17 @@ const onImportFile = async (e: Event) => {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
+  // 会按姓名更新已有学生，先二次确认
+  try {
+    await ElMessageBox.confirm(
+      `确定导入「${file.name}」？已存在的学生将按「姓名」被更新。`,
+      '导入学生确认',
+      { type: 'warning', confirmButtonText: '确认导入', cancelButtonText: '取消' }
+    )
+  } catch {
+    input.value = ''
+    return
+  }
   importing.value = true
   try {
     const text = await file.text()

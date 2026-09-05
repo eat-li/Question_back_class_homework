@@ -82,12 +82,13 @@
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { User, Lock } from '@element-plus/icons-vue'
 import { login } from '../api/auth'
 import { TOKEN_KEY } from '../api/request'
 
 const router = useRouter()
+const route = useRoute()
 const loading = ref(false)
 const form = reactive({ username: '', password: '' })
 
@@ -99,7 +100,10 @@ const submit = async () => {
   try {
     const res = await login({ username: form.username.trim(), password: form.password })
     localStorage.setItem(TOKEN_KEY, res.token)
-    router.push('/')
+    // 回跳登录前所在页面（如 401 被踢 / 未登录直接访问），避免操作现场丢失
+    const redirect = route.query.redirect ? String(route.query.redirect) : ''
+    const target = redirect && redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/'
+    router.replace(target)
   } catch {
     // 错误提示已由 request.ts 统一弹出
   } finally {

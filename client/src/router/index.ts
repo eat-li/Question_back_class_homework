@@ -104,10 +104,12 @@ const router = createRouter({
   ]
 })
 
-// 登录守卫：未登录只能访问 /login
+// 登录守卫：未登录只能访问 /login；携带来源路径，登录后回跳
 router.beforeEach((to) => {
   const token = localStorage.getItem('admin-token')
-  if (to.path !== '/login' && !token) return '/login'
+  if (to.path !== '/login' && !token) {
+    return { path: '/login', query: to.path === '/' ? {} : { redirect: to.fullPath } }
+  }
   if (to.path === '/login' && token) return '/'
   return true
 })

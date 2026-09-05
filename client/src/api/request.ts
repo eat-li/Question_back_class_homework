@@ -13,6 +13,14 @@ export interface ApiError extends Error {
 const createApiError = (message: string): ApiError =>
   Object.assign(new Error(message), { isApiError: true })
 
+// 携带当前路径跳转登录页，便于登录后回跳原页面
+const redirectToLogin = () => {
+  const path = window.location.pathname + window.location.search
+  if (path !== '/login') {
+    window.location.href = `/login?redirect=${encodeURIComponent(path)}`
+  }
+}
+
 // 请求时自动携带登录 Token
 request.interceptors.request.use((config) => {
   const token = localStorage.getItem(TOKEN_KEY)
@@ -44,9 +52,7 @@ request.interceptors.response.use(
       const isLoginRequest = err.config?.url?.includes('/auth/login')
       if (!isLoginRequest) {
         localStorage.removeItem(TOKEN_KEY)
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login'
-        }
+        redirectToLogin()
       }
     } else if (err.response.status === 403) {
       message = '没有权限执行该操作'
@@ -76,9 +82,7 @@ downloadRequest.interceptors.response.use(
   (err) => {
     if (err.response?.status === 401) {
       localStorage.removeItem(TOKEN_KEY)
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login'
-      }
+      redirectToLogin()
     }
     return Promise.reject(err)
   }
@@ -87,7 +91,14 @@ downloadRequest.interceptors.response.use(
 // 带认证的文件下载：直接用 <a href> 打开接口地址不会携带 Authorization 头，
 // 会被后端 401 拒绝；这里先经 axios 携带 Token 拿到文件流，再触发浏览器下载。
 export async function downloadFile(url: string, fallbackName = 'download'): Promise<void> {
-  const res = await downloadRequest.get<Blob>(url, { responseType: 'blob' })
+  let res
+  try {
+    res = await downloadRequest.get<Blob>(url, { responseType: 'blob' })
+  } catch (err: any) {
+    // 401 已由拦截器处理并跳登录；其余错误在这里给出反馈（调用方通常无独立提示）
+    if (err?.response?.status !== 401) ElMessage.error('下载失败，请检查网络后重试')
+    throw err
+  }
   const disposition = res.headers['content-disposition'] || ''
   const match = /filename="?([^";]+)"?/.exec(disposition)
   let filename = match?.[1] || fallbackName

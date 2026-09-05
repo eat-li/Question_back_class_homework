@@ -178,7 +178,7 @@
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="save">保存</el-button>
+        <el-button type="primary" :loading="saving" @click="save">保存</el-button>
       </template>
     </el-dialog>
 
@@ -244,7 +244,11 @@
 
       <template #footer>
         <el-button @click="batchVisible = false">取消</el-button>
-        <el-button type="primary" :disabled="!selectedStudents.length" @click="submitBatch"
+        <el-button
+          type="primary"
+          :disabled="!selectedStudents.length || batchSaving"
+          :loading="batchSaving"
+          @click="submitBatch"
           >确认录入</el-button
         >
       </template>
@@ -285,6 +289,20 @@ const students = ref<Student[]>([])
 // 学生卡片聚合数据（由后端返回考试次数 + 最近一次成绩，不再把全量成绩拉到前端）
 const cards = ref<GradeCard[]>([])
 const loading = ref(false)
+
+// —— 提交防连点 ——
+let saving = false
+let batchSaving = false
+
+// 统一的确认对话框封装：取消时不抛 unhandled rejection，返回是否确认
+const confirmDialog = async (message: string, title = '提示'): Promise<boolean> => {
+  try {
+    await ElMessageBox.confirm(message, title, { type: 'warning' })
+    return true
+  } catch {
+    return false
+  }
+}
 
 // 筛选条件
 const fName = ref('')
@@ -393,6 +411,7 @@ const openDialog = (row?: any, student?: any) => {
 }
 
 const save = async () => {
+  if (saving) return
   if (!form.studentId) return ElMessage.warning('请选择学生')
   if (form.score == null || form.score === '') return ElMessage.warning('请输入得分')
   if (!form.examDate) return ElMessage.warning('请选择考试日期')
@@ -400,17 +419,25 @@ const save = async () => {
     return ElMessage.warning('得分需在 0 ~ 满分 之间')
 
   const payload = { ...form }
-  if (form.id) {
-    await updateGrade(form.id, payload)
-    ElMessage.success('更新成功')
-  } else {
-    await createGrade(payload)
-    ElMessage.success('保存成功')
-  }
-  dialogVisible.value = false
-  await reloadGrades()
-  if (drawerVisible.value && form.studentId) {
-    await loadStudentGrades(form.studentId)
+  saving = true
+  try {
+    if (form.id) {
+      await updateGrade(form.id, payload)
+      ElMessage.success('更新成功')
+    } else {
+      await createGrade(payload)
+      ElMessage.success('保存成功')
+    }
+    dialogVisible.value = false
+    await reloadGrades()
+    if (drawerVisible.value && form.studentId) {
+      await loadStudentGrades(form.studentId)
+    }
+  } catch (err) {
+    // 错误提示已由 request.ts 全局弹出
+    console.error('保存失败', err)
+  } finally {
+    saving = false
   }
 }
 
@@ -435,11 +462,21 @@ const openBatch = () => {
 }
 
 const submitBatch = async () => {
+  if (batchSaving) return
   if (!batchForm.examDate) return ElMessage.warning('请选择考试日期')
   const rows = selectedStudents.value
     .map((s) => ({ studentId: s.id, score: batchScores[s.id] }))
     .filter((r) => r.score != null && r.score !== '')
   if (!rows.length) return ElMessage.warning('请至少为一名学生录入分数')
+  // 有被选学生没填分数时先提示，避免静默跳过
+  const missing = selectedStudents.value.length - rows.length
+  if (missing > 0) {
+    const okFlag = await confirmDialog(
+      `${missing} 名学生未填写分数，将跳过它们。确定继续？`,
+      '批量录入提示'
+    )
+    if (!okFlag) return
+  }
 
   const payload = rows.map((r) => ({
     studentId: r.studentId,
@@ -449,23 +486,40 @@ const submitBatch = async () => {
     examDate: batchForm.examDate,
     score: Number(r.score)
   }))
-  await importGrades(payload)
-  ElMessage.success(`批量录入完成：${rows.length} 名学生`)
-  batchVisible.value = false
-  await reloadGrades()
+  batchSaving = true
+  try {
+    await importGrades(payload)
+    ElMessage.success(`批量录入完成：${rows.length} 名学生`)
+    batchVisible.value = false
+    await reloadGrades()
+  } catch (err) {
+    // 错误提示已由 request.ts 全局弹出
+    console.error('批量录入失败', err)
+  } finally {
+    batchSaving = false
+  }
 }
 
 const remove = async (row: any) => {
-  await ElMessageBox.confirm(
-    `确定删除「${row.student?.name}」的 ${row.subject}·${examTypeLabel(row.examType)} 成绩（${row.score} 分）？`,
-    '提示',
-    { type: 'warning' }
-  )
-  await deleteGrade(row.id)
-  ElMessage.success('删除成功')
-  await reloadGrades()
-  if (drawerVisible.value && currentStudent.value) {
-    await loadStudentGrades(currentStudent.value.id)
+  try {
+    await ElMessageBox.confirm(
+      `确定删除「${row.student?.name}」的 ${row.subject}·${examTypeLabel(row.examType)} 成绩（${row.score} 分）？`,
+      '提示',
+      { type: 'warning' }
+    )
+  } catch {
+    return // 用户取消
+  }
+  try {
+    await deleteGrade(row.id)
+    ElMessage.success('删除成功')
+    await reloadGrades()
+    if (drawerVisible.value && currentStudent.value) {
+      await loadStudentGrades(currentStudent.value.id)
+    }
+  } catch (err) {
+    // 错误提示已由 request.ts 全局弹出
+    console.error('删除失败', err)
   }
 }
 
