@@ -28,7 +28,7 @@ export default defineConfig({
     proxy: {
       // 前端 /api 请求代理到后端
       '/api': {
-        target: process.env.VITE_API_TARGET || 'http://localhost:3000',
+        target: process.env.VITE_API_TARGET || 'http://localhost:4300',
         changeOrigin: true
       }
     }

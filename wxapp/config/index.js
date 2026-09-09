@@ -1,7 +1,7 @@
 // 小程序全局配置
 //
 // 两套环境：
-//   dev  —— 本机联调。API_BASE 填电脑在局域网中的 IP，端口 3000。
+//   dev  —— 本机联调。API_BASE 填电脑在局域网中的 IP，端口 4300。
 //           需要 manifest.json 里 mp-weixin.setting.urlCheck = false 才能请求 http。
 //   prod —— 提审 / 上线。必须是已备案的 https 域名，并在微信公众平台
 //           「开发管理 → 服务器域名」里登记 request 合法域名。
@@ -12,11 +12,11 @@ const isProd = false
 
 const ENV = {
   dev: {
-    API_BASE: 'http://10.76.151.181:3000/api',
+    API_BASE: 'http://10.76.151.181:4300/api',
     OSS_BASE: 'https://blog-saki.oss-cn-chengdu.aliyuncs.com',
     // 开发期直接吃后端 public/katex-fonts（后端已为此加了公开静态路由）
-    // 注意：IP 会随网络变化，这三处要一起改
-    KATEX_FONT_BASE: 'http://10.76.151.181:3000/katex-fonts'
+    // 注意：IP 会随网络变化，这两处（API_BASE / KATEX_FONT_BASE）要一起改
+    KATEX_FONT_BASE: 'http://10.76.151.181:4300/katex-fonts'
   },
   prod: {
     API_BASE: 'https://your-domain.com/api',

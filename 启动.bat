@@ -32,7 +32,7 @@ if errorlevel 1 goto install_fail
 :start_dev
 echo [信息] 正在启动前后端服务...
 echo    前端: http://localhost:5173
-echo    后端: http://localhost:3000
+echo    后端: http://localhost:4300
 echo    关闭本窗口或按 Ctrl+C 可同时停止前后端。
 echo.
 call pnpm dev
