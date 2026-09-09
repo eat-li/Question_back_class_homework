@@ -23,8 +23,9 @@
           }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="300">
+      <el-table-column label="操作" width="400">
         <template #default="{ row }">
+          <el-button size="small" :icon="EditPen" @click="openEdit(row)">编辑</el-button>
           <el-button size="small" :icon="Edit" @click="openScore(row)">打分</el-button>
           <el-button size="small" type="primary" :icon="Download" @click="openExport(row)"
             >导出 PDF</el-button
@@ -46,8 +47,12 @@
     </div>
   </el-card>
 
-  <!-- 发布作业 -->
-  <el-dialog v-model="createVisible" title="发布作业" width="560px">
+  <!-- 发布 / 编辑作业 -->
+  <el-dialog
+    v-model="createVisible"
+    :title="editingId ? '编辑作业' : '发布作业'"
+    width="560px"
+  >
     <el-form :model="form" label-width="80px">
       <el-form-item label="标题"><el-input v-model="form.title" /></el-form-item>
       <el-form-item label="选择题目">
@@ -70,10 +75,25 @@
         <el-date-picker v-model="form.endAt" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" />
       </el-form-item>
       <el-form-item label="备注"><el-input v-model="form.remark" type="textarea" /></el-form-item>
+      <el-form-item v-if="editingId" label="状态">
+        <el-radio-group v-model="form.status">
+          <el-radio-button value="draft">草稿</el-radio-button>
+          <el-radio-button value="published">已发布</el-radio-button>
+          <el-radio-button value="closed">已截止</el-radio-button>
+        </el-radio-group>
+      </el-form-item>
     </el-form>
+    <el-alert
+      v-if="editingId"
+      type="info"
+      :closable="false"
+      show-icon
+      title="修改会同步到该作业关联的题目与学生；已录入的成绩不受影响。"
+      style="margin-top: 4px"
+    />
     <template #footer>
       <el-button @click="createVisible = false">取消</el-button>
-      <el-button type="primary" @click="save">发布</el-button>
+      <el-button type="primary" @click="save">{{ editingId ? '保存修改' : '发布' }}</el-button>
     </template>
   </el-dialog>
 
@@ -346,13 +366,14 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { Plus, Edit, Download, Delete } from '@element-plus/icons-vue'
+import { Plus, Edit, EditPen, Download, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getHomeworks,
   getHomework,
   getHomeworkQuestions,
   createHomework,
+  updateHomework,
   deleteHomework,
   saveHomeworkScores
 } from '../../api/homework'
@@ -367,6 +388,7 @@ const list = ref<Homework[]>([])
 const questions = ref<Question[]>([])
 const loading = ref(false)
 const createVisible = ref(false)
+const editingId = ref<number | null>(null) // 非空 = 编辑已有作业
 
 // 作业列表分页
 const page = ref(1)
@@ -450,10 +472,32 @@ const load = async () => {
 }
 
 const openCreate = () => {
+  editingId.value = null
   Object.keys(form).forEach((k) => delete form[k])
   form.questionIds = []
   form.studentIds = []
   form.status = 'published'
+  pickMode.value = 'multi'
+  pickedIds.value = []
+  qKeyword.value = ''
+  qType.value = ''
+  qKnowledgeTag.value = ''
+  qKnowledgeSubTag.value = ''
+  qSubKnowledgeOptions.value = []
+  createVisible.value = true
+}
+
+// 编辑已有作业：拉取详情并预填表单（题目/学生/截止/备注/状态均可改）
+const openEdit = async (row: any) => {
+  const detail = await getHomework(row.id)
+  editingId.value = row.id
+  Object.keys(form).forEach((k) => delete form[k])
+  form.title = detail.title || ''
+  form.questionIds = detail.questionIds || []
+  form.studentIds = detail.studentIds || []
+  form.endAt = detail.endAt || null
+  form.remark = detail.remark || ''
+  form.status = detail.status || 'published'
   pickMode.value = 'multi'
   pickedIds.value = []
   qKeyword.value = ''
@@ -747,8 +791,14 @@ const save = async () => {
     ElMessage.warning('请先选择学生')
     return
   }
-  await createHomework(form)
-  ElMessage.success('发布成功')
+  if (editingId.value) {
+    await updateHomework(editingId.value, form)
+    ElMessage.success('修改已保存')
+  } else {
+    await createHomework(form)
+    ElMessage.success('发布成功')
+  }
+  editingId.value = null
   createVisible.value = false
   load()
 }
