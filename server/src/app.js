@@ -1,6 +1,7 @@
 // Express 应用装配
 const express = require('express')
 const cors = require('cors')
+const path = require('path')
 const routes = require('./routes')
 const errorHandler = require('./middlewares/errorHandler')
 
@@ -84,6 +85,20 @@ app.use(express.json({ limit: '2mb' }))
 
 // 健康检查
 app.get('/api/health', (req, res) => res.json({ code: 0, message: 'ok', data: { status: 'up' } }))
+
+// KaTeX 字体（小程序公式渲染用）
+// 必须公开，不能挂在 requireAuth 下面：
+// uni.loadFontFace / @font-face 发起的请求不会带 Authorization 头
+app.use(
+  '/katex-fonts',
+  express.static(path.join(__dirname, '../public/katex-fonts'), {
+    maxAge: '30d',
+    setHeaders(res) {
+      // 小程序端字体请求来自不同源，需要显式放开
+      res.setHeader('Access-Control-Allow-Origin', '*')
+    }
+  })
+)
 
 // 业务路由
 app.use('/api', routes)
