@@ -56,6 +56,15 @@ export const printHtml = (
   )
   win.document.close()
   win.focus()
-  setTimeout(() => win.print(), 300)
+  // 等待字体（KaTeX woff2）与资源就绪再触发打印，避免公式/图片未加载就出纸；
+  // 3s 兜底超时防止卡死（无外部字体时 fonts.ready 也会很快 resolve）
+  let printed = false
+  const doPrint = () => {
+    if (printed) return
+    printed = true
+    win.print()
+  }
+  const fontsReady = win.document.fonts?.ready ? win.document.fonts.ready : Promise.resolve()
+  Promise.race([fontsReady, new Promise((r) => setTimeout(r, 3000))]).then(doPrint).catch(doPrint)
   return true
 }

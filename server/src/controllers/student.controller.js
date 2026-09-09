@@ -131,12 +131,13 @@ exports.import = async (req, res, next) => {
     let updated = 0
     let failed = 0
 
-    // 一次性取出全部已有学生，按姓名建索引，把原「循环内逐条 findOne」的 N+1 查询
-    // 降为 1 次查询 + 1 次批量写入，导入大文件时性能提升显著。
+    // 一次性取出全部已有学生，按姓名建索引（1 次查询）；
+    // 已有学生的更新也收集后一次批量写，避免逐条 UPDATE 的 N+1 写。
     const existing = await Student.findAll({ attributes: ['id', 'name'] })
     const byName = new Map(existing.map((s) => [s.name, s]))
 
     const toCreate = []
+    const toUpdate = []
     for (const it of items) {
       if (!it || !it.name) {
         failed++
@@ -150,7 +151,8 @@ exports.import = async (req, res, next) => {
       payload.name = payload.name.trim()
       const student = byName.get(payload.name)
       if (student) {
-        await student.update(payload)
+        // 携带主键 id，bulkCreate 按主键触发更新，不依赖 name 唯一索引
+        toUpdate.push({ id: student.id, ...payload })
         updated++
       } else {
         toCreate.push(payload)
@@ -158,6 +160,11 @@ exports.import = async (req, res, next) => {
       }
     }
     if (toCreate.length) await Student.bulkCreate(toCreate)
+    if (toUpdate.length) {
+      await Student.bulkCreate(toUpdate, {
+        updateOnDuplicate: ['name', 'grade', 'contact', 'remark']
+      })
+    }
 
     cacheDel('stats:overview')
     ok(res, { created, updated, failed }, `导入完成：新增 ${created} 名，更新 ${updated} 名`)

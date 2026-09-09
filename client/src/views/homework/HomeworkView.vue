@@ -30,7 +30,11 @@
   <!-- 查看作业内容（学生视角，不显示答案） -->
   <el-drawer v-model="viewVisible" title="查看作业" size="60%">
     <div v-loading="detailLoading" class="hw-view">
-      <template v-if="current">
+      <div v-if="detailError" class="hw-error">
+        <p class="hw-error__text">作业加载失败，请检查网络后重试。</p>
+        <el-button size="small" type="primary" @click="loadDetail">重试</el-button>
+      </div>
+      <template v-else-if="current">
         <div class="hw-view__head">
           <h2 class="hw-view__title">{{ current.title }}</h2>
           <div class="hw-view__meta">
@@ -74,6 +78,7 @@ const list = ref<Homework[]>([])
 const loading = ref(false)
 const viewVisible = ref(false)
 const detailLoading = ref(false)
+const detailError = ref(false)
 const current = ref<Homework | null>(null)
 const questions = ref<Question[]>([])
 
@@ -99,10 +104,20 @@ const load = async () => {
 const openView = async (row: any) => {
   current.value = row
   questions.value = []
+  detailError.value = false
   viewVisible.value = true
+  await loadDetail()
+}
+
+// 加载当前作业题目（独立成函数以便失败后重试）
+const loadDetail = async () => {
+  if (!current.value) return
   detailLoading.value = true
+  detailError.value = false
   try {
-    questions.value = await getHomeworkQuestions(row.id)
+    questions.value = await getHomeworkQuestions(current.value.id)
+  } catch (e) {
+    detailError.value = true // 区分「加载失败」与「该作业没有题目」
   } finally {
     detailLoading.value = false
   }
@@ -131,6 +146,16 @@ onMounted(load)
 .end-at--expired {
   color: #f56c6c;
   font-weight: 600;
+}
+
+.hw-error {
+  padding: 48px 0;
+  text-align: center;
+}
+.hw-error__text {
+  margin: 0 0 12px;
+  color: #9ca3af;
+  font-size: 14px;
 }
 
 .hw-view__head {

@@ -1,5 +1,16 @@
 <template>
-  <div class="dashboard">
+  <div class="dashboard" v-loading="loading">
+    <el-alert
+      v-if="loadError"
+      title="数据加载失败"
+      type="error"
+      :closable="false"
+      show-icon
+      style="margin-bottom: 16px"
+    >
+      <el-button link type="primary" @click="load">重试</el-button>
+    </el-alert>
+
     <!-- 统计卡片 -->
     <div class="stat-grid">
       <div v-for="c in statCards" :key="c.label" class="stat-card">
@@ -41,6 +52,8 @@ import { useECharts } from '../composables/useECharts'
 import { questionTypeLabel } from '../utils/format'
 
 const stats = ref<any>(null)
+const loading = ref(false)
+const loadError = ref(false)
 const typeRef = ref<HTMLElement>()
 const difficultyRef = ref<HTMLElement>()
 const knowledgeRef = ref<HTMLElement>()
@@ -49,31 +62,15 @@ const { init: initChart, resizeAll } = useECharts()
 
 const typeLabel = questionTypeLabel
 
+// 数据未就绪时卡片显示「—」，避免慢网先闪 0 值
 const statCards = computed(() => {
   const c = stats.value?.counts || {}
+  const v = (n: number | undefined) => (stats.value ? (n ?? 0) : '—')
   return [
-    {
-      label: '题目总数',
-      value: c.questionCount ?? 0,
-      icon: Document,
-      bg: '#e3ece9',
-      color: '#46645c'
-    },
-    { label: '学生人数', value: c.studentCount ?? 0, icon: User, bg: '#f3eddf', color: '#a8874a' },
-    {
-      label: '作业总数',
-      value: c.homeworkCount ?? 0,
-      icon: Notebook,
-      bg: '#e9edf3',
-      color: '#5b6b82'
-    },
-    {
-      label: '成绩记录',
-      value: c.submissionCount ?? 0,
-      icon: Trophy,
-      bg: '#f3e9e4',
-      color: '#a06a5a'
-    }
+    { label: '题目总数', value: v(c.questionCount), icon: Document, bg: '#e3ece9', color: '#46645c' },
+    { label: '学生人数', value: v(c.studentCount), icon: User, bg: '#f3eddf', color: '#a8874a' },
+    { label: '作业总数', value: v(c.homeworkCount), icon: Notebook, bg: '#e9edf3', color: '#5b6b82' },
+    { label: '成绩记录', value: v(c.submissionCount), icon: Trophy, bg: '#f3e9e4', color: '#a06a5a' }
   ]
 })
 
@@ -174,9 +171,19 @@ const renderCharts = () => {
 const handleResize = resizeAll
 
 const load = async () => {
-  stats.value = await getStats()
-  await nextTick()
-  renderCharts()
+  loading.value = true
+  loadError.value = false
+  try {
+    stats.value = await getStats()
+    await nextTick()
+    renderCharts()
+  } catch (err) {
+    loadError.value = true
+    // 错误提示已由 request.ts 全局弹出
+    console.error('首页数据加载失败', err)
+  } finally {
+    loading.value = false
+  }
 }
 
 onMounted(() => {

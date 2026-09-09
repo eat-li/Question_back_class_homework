@@ -382,6 +382,7 @@ import { getStudents } from '../../api/student'
 import RichContent from '../../components/RichContent.vue'
 import { printHtml, PAPER_FONT } from '../../utils/printHtml'
 import { renderMathInHtml } from '../../utils/mathRender'
+import { sanitizeHtml } from '../../utils/sanitizeHtml'
 import type { Homework, Question } from '../../types'
 
 const list = ref<Homework[]>([])
@@ -753,8 +754,8 @@ const buildHomeworkHtml = () => {
     .join('')
 }
 
-// 预览 HTML（字符串级 KaTeX 渲染：公式跨 <br> 也能正确匹配，如 \begin{array} 表格）
-const previewHtml = computed(() => renderMathInHtml(buildHomeworkHtml()))
+// 预览 HTML：先消毒再公式渲染（与打印路径一致，堵住题目富文本潜在 XSS）
+const previewHtml = computed(() => renderMathInHtml(sanitizeHtml(buildHomeworkHtml())))
 
 // 打开导出预览
 const openExport = async (row: any) => {

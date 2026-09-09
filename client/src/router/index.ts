@@ -114,4 +114,15 @@ router.beforeEach((to) => {
   return true
 })
 
+// 浏览器标签页标题随路由同步（多标签时便于区分）
+router.afterEach((to) => {
+  let page = to.meta.title ? String(to.meta.title) : ''
+  // 知识点题目页：标题带上具体知识点名
+  if (to.name === 'knowledgeQuestions' && to.params.tag) {
+    const tag = String(to.params.tag)
+    page = (tag === '__empty__' ? '未分类' : tag) + ' · 题目'
+  }
+  document.title = page ? `${page} - 教师辅助` : '教师辅助'
+})
+
 export default router

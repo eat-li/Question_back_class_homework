@@ -48,7 +48,7 @@
 
     <el-empty v-if="!loading && !hasData" description="暂无成绩数据，请先在「成绩录入」中录入" />
 
-    <div v-else class="chart-grid">
+    <div v-else class="chart-grid" v-loading="loading">
       <!-- 趋势折线图（单学生） -->
       <el-card v-if="summary.trend.length" class="chart-card chart-card--wide">
         <template #header>
@@ -355,14 +355,19 @@ const renderAll = () => {
 
 const handleResize = resizeAll
 
+// 请求序号：筛选多次快速触发时只采纳最新一次响应，丢弃过期结果
+let loadSeq = 0
 const load = async () => {
+  const seq = ++loadSeq
   loading.value = true
   try {
-    summary.value = await getGradeSummary(buildFilters())
+    const data = await getGradeSummary(buildFilters())
+    if (seq !== loadSeq) return // 已有更新的请求，丢弃本次响应
+    summary.value = data
     await nextTick()
     renderAll()
   } finally {
-    loading.value = false
+    if (seq === loadSeq) loading.value = false
   }
 }
 

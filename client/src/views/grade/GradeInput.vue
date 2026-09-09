@@ -96,7 +96,7 @@
         </el-button>
       </div>
 
-      <el-table :data="currentGrades" border stripe max-height="60vh">
+      <el-table :data="currentGrades" border stripe max-height="60vh" v-loading="drawerLoading">
         <el-table-column label="日期" prop="examDate" width="120" />
         <el-table-column label="类型" width="100">
           <template #default="{ row }">
@@ -126,7 +126,7 @@
           </template>
         </el-table-column>
       </el-table>
-      <el-empty v-if="!currentGrades.length" description="该生暂无符合条件的成绩" />
+      <el-empty v-if="!drawerLoading && !currentGrades.length" description="该生暂无符合条件的成绩" />
     </el-drawer>
 
     <!-- 新增 / 编辑 -->
@@ -319,6 +319,7 @@ const visibleCards = computed(() => {
 // 抽屉
 const drawerVisible = ref(false)
 const currentStudent = ref<GradeCard | null>(null)
+const drawerLoading = ref(false) // 成绩抽屉加载态（区分加载中与"暂无成绩"）
 const currentGrades = ref<ExamScore[]>([])
 
 const percent = (row: any) =>
@@ -348,11 +349,16 @@ const reloadGrades = async () => {
 }
 
 const loadStudentGrades = async (studentId: number) => {
-  currentGrades.value = await getGrades({
-    studentId,
-    examType: fExamType.value || undefined,
-    examDate: fExamDate.value || undefined
-  })
+  drawerLoading.value = true
+  try {
+    currentGrades.value = await getGrades({
+      studentId,
+      examType: fExamType.value || undefined,
+      examDate: fExamDate.value || undefined
+    })
+  } finally {
+    drawerLoading.value = false
+  }
 }
 
 const onNameInput = () => {
