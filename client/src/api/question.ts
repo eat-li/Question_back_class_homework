@@ -7,6 +7,8 @@ export interface QuestionQuery {
   difficulty?: number
   knowledgeTag?: string
   knowledgeSubTag?: string
+  /** 按 id 批量取（逗号分隔，如 '3,7,9'） */
+  ids?: string
   page?: number
   pageSize?: number
 }

@@ -45,14 +45,23 @@ const validate = (payload, { partial = false } = {}) => {
   return null
 }
 
-// 列表（关键词/题型/难度/知识点/二级知识点检索，支持分页）
+// 列表（关键词/题型/难度/知识点/二级知识点/按 id 批量检索，支持分页）
 exports.list = async (req, res, next) => {
   try {
-    const { keyword, type, difficulty, knowledgeTag, knowledgeSubTag, page, pageSize } = req.query
+    const { keyword, type, difficulty, knowledgeTag, knowledgeSubTag, ids, page, pageSize } =
+      req.query
     const where = {}
     if (keyword) where.title = { [Op.like]: `%${keyword}%` }
     if (type) where.type = type
     if (difficulty) where.difficulty = Number(difficulty)
+    // 按 id 批量取（如 ids=3,7,9）：用于查看已选题目并调整顺序
+    if (ids !== undefined) {
+      const idList = String(ids)
+        .split(',')
+        .map((x) => Number(x))
+        .filter((n) => Number.isInteger(n) && n > 0)
+      where.id = { [Op.in]: idList.length ? idList : [-1] }
+    }
     if (knowledgeTag === '__empty__') {
       // 约定值：筛选「未分类」题目（知识点为空）
       where.knowledgeTag = { [Op.or]: [null, ''] }

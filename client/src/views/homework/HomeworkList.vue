@@ -62,6 +62,12 @@
             <el-radio-button value="single">单选</el-radio-button>
           </el-radio-group>
           <el-button size="small" type="primary" @click="openPicker">抽题</el-button>
+          <el-button
+            size="small"
+            :disabled="!(form.questionIds || []).length"
+            @click="openSelected"
+            >查看 / 排序</el-button
+          >
           <span class="picked-count">已选 {{ (form.questionIds || []).length }} 题</span>
         </div>
       </el-form-item>
@@ -211,6 +217,64 @@
       <el-button type="primary" @click="confirmPick">确定</el-button>
     </template>
   </el-drawer>
+
+  <!-- 已选题目：查看与手动排序 -->
+  <el-dialog v-model="selectedVisible" title="已选题目（可拖动调整顺序）" width="760px" top="6vh">
+    <div v-loading="selectedLoading" class="sel-wrap">
+      <el-empty v-if="!selectedLoading && !selectedList.length" description="还没有选择题目" />
+      <div
+        v-for="(q, i) in selectedList"
+        :key="q.id"
+        class="sel-row"
+        :class="{ 'is-dragging': dragIndex === i }"
+        @dragover.prevent="onSelDragOver(i)"
+        @drop.prevent="onSelDrop"
+      >
+        <span class="sel-no">{{ i + 1 }}</span>
+        <span
+          class="sel-handle"
+          draggable="true"
+          title="按住拖动调整顺序"
+          @dragstart="onSelDragStart(i)"
+          @dragend="onSelDragEnd"
+          >⠿</span
+        >
+        <div class="sel-main">
+          <RichContent class="sel-title" :html="q.title || ''" />
+          <div class="sel-tags">
+            <el-tag size="small" type="info">{{ typeLabel(q.type) }}</el-tag>
+            <el-tag size="small" type="warning">{{
+              '★'.repeat(q.difficulty || 0) || '—'
+            }}</el-tag>
+            <el-tag v-if="q.knowledgeTag" size="small"
+              >{{ q.knowledgeTag
+              }}{{ q.knowledgeSubTag ? ' › ' + q.knowledgeSubTag : '' }}</el-tag
+            >
+          </div>
+        </div>
+        <div class="sel-actions">
+          <el-button size="small" text :disabled="i === 0" @click="moveSelected(i, -1)"
+            >上移</el-button
+          >
+          <el-button
+            size="small"
+            text
+            :disabled="i === selectedList.length - 1"
+            @click="moveSelected(i, 1)"
+            >下移</el-button
+          >
+          <el-button size="small" text type="danger" @click="removeSelected(i)">移除</el-button>
+        </div>
+      </div>
+    </div>
+    <template #footer>
+      <el-button @click="selectedVisible = false">取消</el-button>
+      <el-button type="danger" plain :disabled="!selectedList.length" @click="clearSelected"
+        >清空</el-button
+      >
+      <el-button type="primary" @click="confirmSelected">确定（按此顺序）</el-button>
+    </template>
+  </el-dialog>
 
   <!-- 选择学生 -->
   <el-drawer v-model="studentDrawerVisible" title="选择学生" size="60%">
@@ -609,6 +673,72 @@ const confirmPick = () => {
   drawerVisible.value = false
 }
 
+// —— 已选题目：查看与手动排序 ——
+const selectedVisible = ref(false)
+const selectedLoading = ref(false)
+const selectedList = ref<any[]>([])
+const dragIndex = ref<number | null>(null)
+
+// 打开「已选题目」：按当前顺序取回题目详情（顺序 = 打印/导出顺序）
+const openSelected = async () => {
+  const ids: number[] = form.questionIds || []
+  if (!ids.length) return
+  selectedVisible.value = true
+  selectedLoading.value = true
+  try {
+    const rows: any[] = await getQuestions({ ids: ids.join(',') })
+    const map = new Map(rows.map((q: any) => [q.id, q]))
+    // 依据 form.questionIds 的顺序排列；已被删除的题目自动剔除
+    selectedList.value = ids.map((id) => map.get(id)).filter(Boolean)
+  } catch {
+    selectedList.value = []
+  } finally {
+    selectedLoading.value = false
+  }
+}
+
+// 上移 / 下移
+const moveSelected = (index: number, delta: number) => {
+  const target = index + delta
+  if (target < 0 || target >= selectedList.value.length) return
+  const arr = selectedList.value.slice()
+  const [item] = arr.splice(index, 1)
+  arr.splice(target, 0, item)
+  selectedList.value = arr
+}
+
+const removeSelected = (index: number) => {
+  selectedList.value = selectedList.value.filter((_, i) => i !== index)
+}
+
+const clearSelected = () => {
+  selectedList.value = []
+}
+
+// 拖拽排序：拖过某一行即把该行插到目标位置（实时预览）
+const onSelDragStart = (index: number) => {
+  dragIndex.value = index
+}
+const onSelDragOver = (index: number) => {
+  if (dragIndex.value === null || dragIndex.value === index) return
+  moveSelected(dragIndex.value, index - dragIndex.value)
+  dragIndex.value = index
+}
+const onSelDragEnd = () => {
+  dragIndex.value = null
+}
+const onSelDrop = () => {
+  dragIndex.value = null
+}
+
+// 确定：把当前顺序写回表单（并同步抽题框的选中态）
+const confirmSelected = () => {
+  form.questionIds = selectedList.value.map((q) => q.id)
+  pickedIds.value = [...form.questionIds]
+  selectedVisible.value = false
+  ElMessage.success(`已保存题目顺序（共 ${form.questionIds.length} 题）`)
+}
+
 // 加载学生列表（选择学生抽屉内）
 const loadStudents = async () => {
   sLoading.value = true
@@ -892,6 +1022,85 @@ onMounted(load)
 /* 放大选择框，便于点击 */
 .pick-check {
   transform: scale(1.35);
+}
+
+/* —— 已选题目查看 / 排序 —— */
+.sel-wrap {
+  max-height: 56vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.sel-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fffdf9;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.sel-row:hover {
+  border-color: var(--moss);
+  box-shadow: 0 2px 8px rgba(107, 143, 113, 0.12);
+}
+.sel-row.is-dragging {
+  opacity: 0.55;
+  border-style: dashed;
+}
+.sel-no {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  line-height: 22px;
+  text-align: center;
+  border-radius: 50%;
+  background: var(--moss-soft);
+  color: var(--moss-deep);
+  font-size: 12px;
+  font-weight: 600;
+}
+.sel-handle {
+  flex-shrink: 0;
+  cursor: grab;
+  color: var(--ink-soft);
+  font-size: 16px;
+  line-height: 22px;
+  user-select: none;
+}
+.sel-handle:active {
+  cursor: grabbing;
+}
+.sel-main {
+  flex: 1;
+  min-width: 0;
+}
+.sel-title {
+  font-size: 13px;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sel-title :deep(.katex-display) {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.sel-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.sel-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 .q-title {
   font-size: 16px;
