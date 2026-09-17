@@ -219,22 +219,34 @@
   </el-drawer>
 
   <!-- 已选题目：查看与手动排序 -->
-  <el-dialog v-model="selectedVisible" title="已选题目（可拖动调整顺序）" width="760px" top="6vh">
+  <el-dialog v-model="selectedVisible" title="已选题目（点击两题即可互换顺序）" width="760px" top="6vh">
+    <div class="sel-hint">
+      <template v-if="swapIndex === null">
+        点击任意一题选中，再点另一题即可<b>互换位置</b>；也可拖动左侧 ⠿ 或用「上移/下移」微调。
+      </template>
+      <template v-else>
+        已选中第 <b>{{ swapIndex + 1 }}</b> 题 —— 再点另一题交换位置，点自己或点「取消选中」放弃。
+        <el-button link type="primary" size="small" @click="swapIndex = null">取消选中</el-button>
+      </template>
+    </div>
     <div v-loading="selectedLoading" class="sel-wrap">
       <el-empty v-if="!selectedLoading && !selectedList.length" description="还没有选择题目" />
       <div
         v-for="(q, i) in selectedList"
         :key="q.id"
         class="sel-row"
-        :class="{ 'is-dragging': dragIndex === i }"
+        :class="{ 'is-dragging': dragIndex === i, 'is-picked': swapIndex === i }"
+        :title="swapIndex === null ? '点击选中该题，再点另一题即可交换顺序' : '点击与选中题目交换位置'"
+        @click="onSelRowClick(i)"
         @dragover.prevent="onSelDragOver(i)"
         @drop.prevent="onSelDrop"
       >
-        <span class="sel-no">{{ i + 1 }}</span>
+        <span class="sel-no" :class="{ 'is-picked': swapIndex === i }">{{ i + 1 }}</span>
         <span
           class="sel-handle"
           draggable="true"
           title="按住拖动调整顺序"
+          @click.stop
           @dragstart="onSelDragStart(i)"
           @dragend="onSelDragEnd"
           >⠿</span
@@ -253,17 +265,19 @@
           </div>
         </div>
         <div class="sel-actions">
-          <el-button size="small" text :disabled="i === 0" @click="moveSelected(i, -1)"
+          <el-button size="small" text :disabled="i === 0" @click.stop="moveSelected(i, -1)"
             >上移</el-button
           >
           <el-button
             size="small"
             text
             :disabled="i === selectedList.length - 1"
-            @click="moveSelected(i, 1)"
+            @click.stop="moveSelected(i, 1)"
             >下移</el-button
           >
-          <el-button size="small" text type="danger" @click="removeSelected(i)">移除</el-button>
+          <el-button size="small" text type="danger" @click.stop="removeSelected(i)"
+            >移除</el-button
+          >
         </div>
       </div>
     </div>
@@ -678,11 +692,13 @@ const selectedVisible = ref(false)
 const selectedLoading = ref(false)
 const selectedList = ref<any[]>([])
 const dragIndex = ref<number | null>(null)
+const swapIndex = ref<number | null>(null) // 点选互换：已选中待交换的题序号
 
 // 打开「已选题目」：按当前顺序取回题目详情（顺序 = 打印/导出顺序）
 const openSelected = async () => {
   const ids: number[] = form.questionIds || []
   if (!ids.length) return
+  swapIndex.value = null
   selectedVisible.value = true
   selectedLoading.value = true
   try {
@@ -697,6 +713,24 @@ const openSelected = async () => {
   }
 }
 
+// 点击整行：点选两题互换位置（点自己 = 取消选中）
+const onSelRowClick = (index: number) => {
+  if (swapIndex.value === null) {
+    swapIndex.value = index
+    return
+  }
+  if (swapIndex.value === index) {
+    swapIndex.value = null
+    return
+  }
+  const from = swapIndex.value
+  const arr = selectedList.value.slice()
+  ;[arr[from], arr[index]] = [arr[index], arr[from]]
+  selectedList.value = arr
+  swapIndex.value = null
+  ElMessage.success(`已交换第 ${from + 1} 题与第 ${index + 1} 题的位置`)
+}
+
 // 上移 / 下移
 const moveSelected = (index: number, delta: number) => {
   const target = index + delta
@@ -705,19 +739,26 @@ const moveSelected = (index: number, delta: number) => {
   const [item] = arr.splice(index, 1)
   arr.splice(target, 0, item)
   selectedList.value = arr
+  swapIndex.value = null // 位置已变化，清掉点选态避免错位
 }
 
 const removeSelected = (index: number) => {
   selectedList.value = selectedList.value.filter((_, i) => i !== index)
+  // 维护点选态：删掉选中项则取消；删掉前面的项则序号前移
+  if (swapIndex.value === null) return
+  if (swapIndex.value === index) swapIndex.value = null
+  else if (swapIndex.value > index) swapIndex.value -= 1
 }
 
 const clearSelected = () => {
   selectedList.value = []
+  swapIndex.value = null
 }
 
 // 拖拽排序：拖过某一行即把该行插到目标位置（实时预览）
 const onSelDragStart = (index: number) => {
   dragIndex.value = index
+  swapIndex.value = null
 }
 const onSelDragOver = (index: number) => {
   if (dragIndex.value === null || dragIndex.value === index) return
@@ -735,6 +776,7 @@ const onSelDrop = () => {
 const confirmSelected = () => {
   form.questionIds = selectedList.value.map((q) => q.id)
   pickedIds.value = [...form.questionIds]
+  swapIndex.value = null
   selectedVisible.value = false
   ElMessage.success(`已保存题目顺序（共 ${form.questionIds.length} 题）`)
 }
@@ -1025,6 +1067,15 @@ onMounted(load)
 }
 
 /* —— 已选题目查看 / 排序 —— */
+.sel-hint {
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--moss-soft);
+  color: var(--moss-deep);
+  font-size: 13px;
+  line-height: 1.6;
+}
 .sel-wrap {
   max-height: 56vh;
   overflow-y: auto;
@@ -1039,13 +1090,21 @@ onMounted(load)
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #fffdf9;
+  cursor: pointer;
   transition:
     border-color 0.15s ease,
-    box-shadow 0.15s ease;
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
 }
 .sel-row:hover {
   border-color: var(--moss);
   box-shadow: 0 2px 8px rgba(107, 143, 113, 0.12);
+}
+/* 点选待交换 */
+.sel-row.is-picked {
+  border-color: var(--moss);
+  background: var(--moss-soft);
+  box-shadow: 0 0 0 2px rgba(107, 143, 113, 0.25);
 }
 .sel-row.is-dragging {
   opacity: 0.55;
@@ -1062,6 +1121,11 @@ onMounted(load)
   color: var(--moss-deep);
   font-size: 12px;
   font-weight: 600;
+  transition: all 0.15s ease;
+}
+.sel-no.is-picked {
+  background: var(--moss);
+  color: #fffdf9;
 }
 .sel-handle {
   flex-shrink: 0;
