@@ -219,7 +219,13 @@
   </el-drawer>
 
   <!-- 已选题目：查看与手动排序 -->
-  <el-dialog v-model="selectedVisible" title="已选题目（点击两题即可互换顺序）" width="760px" top="6vh">
+  <el-dialog
+    v-model="selectedVisible"
+    title="已选题目（点击两题即可互换顺序）"
+    width="92%"
+    style="max-width: 1240px"
+    top="4vh"
+  >
     <div class="sel-hint">
       <template v-if="swapIndex === null">
         点击任意一题选中，再点另一题即可<b>互换位置</b>；也可拖动左侧 ⠿ 或用「上移/下移」微调。
@@ -1077,16 +1083,16 @@ onMounted(load)
   line-height: 1.6;
 }
 .sel-wrap {
-  max-height: 56vh;
+  max-height: 68vh;
   overflow-y: auto;
   padding-right: 4px;
 }
 .sel-row {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 10px 12px;
-  margin-bottom: 8px;
+  gap: 14px;
+  padding: 14px 18px;
+  margin-bottom: 10px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #fffdf9;
@@ -1143,10 +1149,10 @@ onMounted(load)
   min-width: 0;
 }
 .sel-title {
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 14px;
+  line-height: 1.65;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
