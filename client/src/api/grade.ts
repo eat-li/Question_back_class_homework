@@ -1,5 +1,5 @@
 import request from './request'
-import type { ExamScore, GradeCard } from '../types'
+import type { ExamScore, GradeCard, GradeSummary } from '../types'
 
 export interface GradeQuery {
   studentId?: number
@@ -9,13 +9,6 @@ export interface GradeQuery {
   endDate?: string
   examDate?: string
   studentName?: string
-}
-
-export interface GradeSummary {
-  trend: any[]
-  radar: any[]
-  distribution: any[]
-  compare: any[]
 }
 
 export const getGrades = (params?: GradeQuery): Promise<ExamScore[]> =>

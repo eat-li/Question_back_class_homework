@@ -1,5 +1,12 @@
 <template>
   <div class="dashboard" v-loading="loading">
+    <section class="dashboard-intro">
+      <div>
+        <p class="intro-eyebrow">今日概览</p>
+        <h1 class="intro-title">把教学线索收拢在一处</h1>
+      </div>
+      <p class="intro-copy">题库、作业与成绩数据会在这里同步更新，方便快速判断下一步教学安排。</p>
+    </section>
     <el-alert
       v-if="loadError"
       title="数据加载失败"
@@ -13,7 +20,8 @@
 
     <!-- 统计卡片 -->
     <div class="stat-grid">
-      <div v-for="c in statCards" :key="c.label" class="stat-card">
+      <article v-for="(c, index) in statCards" :key="c.label" class="stat-card">
+        <span class="stat-index">0{{ index + 1 }}</span>
         <div class="stat-icon" :style="{ background: c.bg, color: c.color }">
           <el-icon :size="22"><component :is="c.icon" /></el-icon>
         </div>
@@ -21,7 +29,7 @@
           <div class="stat-value">{{ c.value }}</div>
           <div class="stat-label">{{ c.label }}</div>
         </div>
-      </div>
+      </article>
     </div>
 
     <!-- 图表 -->
@@ -67,10 +75,28 @@ const statCards = computed(() => {
   const c = stats.value?.counts || {}
   const v = (n: number | undefined) => (stats.value ? (n ?? 0) : '—')
   return [
-    { label: '题目总数', value: v(c.questionCount), icon: Document, bg: '#e3ece9', color: '#46645c' },
-    { label: '学生人数', value: v(c.studentCount), icon: User, bg: '#f3eddf', color: '#a8874a' },
-    { label: '作业总数', value: v(c.homeworkCount), icon: Notebook, bg: '#e9edf3', color: '#5b6b82' },
-    { label: '成绩记录', value: v(c.submissionCount), icon: Trophy, bg: '#f3e9e4', color: '#a06a5a' }
+    {
+      label: '题目总数',
+      value: v(c.questionCount),
+      icon: Document,
+      bg: '#e1ebe5',
+      color: '#24483f'
+    },
+    { label: '学生人数', value: v(c.studentCount), icon: User, bg: '#eee8dc', color: '#7f5e28' },
+    {
+      label: '作业总数',
+      value: v(c.homeworkCount),
+      icon: Notebook,
+      bg: '#e7ebe3',
+      color: '#56634d'
+    },
+    {
+      label: '成绩记录',
+      value: v(c.submissionCount),
+      icon: Trophy,
+      bg: '#f5e5e1',
+      color: '#934236'
+    }
   ]
 })
 
@@ -90,7 +116,7 @@ const renderCharts = () => {
   renderOne(typeRef.value!, {
     tooltip: { trigger: 'item', formatter: '{b}: {c} 题 ({d}%)' },
     legend: { bottom: 0, icon: 'circle' },
-    color: ['#5b7d74', '#c2a878', '#8a9bb0'],
+    color: ['#2f6658', '#a47732', '#b24c3d'],
     series: [
       {
         type: 'pie',
@@ -200,7 +226,40 @@ onBeforeUnmount(() => {
 .dashboard {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.dashboard-intro {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 4px 0 10px;
+  border-bottom: 1px solid var(--line-strong);
+}
+.intro-eyebrow {
+  margin: 0 0 6px;
+  color: var(--moss);
+  font-size: 12px;
+  font-weight: 650;
+}
+.intro-title {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.intro-copy {
+  max-width: 32rem;
+  margin: 0 0 3px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.75;
+  text-align: right;
 }
 
 .stat-grid {
@@ -209,34 +268,44 @@ onBeforeUnmount(() => {
   gap: 16px;
 }
 .stat-card {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 14px;
-  background: #fffdf9;
+  min-height: 112px;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 20px 22px;
+  padding: 22px 20px;
   box-shadow: var(--shadow-soft);
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease;
 }
 .stat-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   box-shadow: var(--shadow-hover);
 }
 .stat-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: 5px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 24px;
   flex-shrink: 0;
 }
+.stat-index {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  color: #aab2ad;
+  font-family: var(--font-data);
+  font-size: 10px;
+}
 .stat-value {
-  font-family: var(--font-display);
+  font-family: var(--font-data);
   font-size: 30px;
   font-weight: 700;
   color: var(--ink);
@@ -257,16 +326,23 @@ onBeforeUnmount(() => {
   grid-column: span 2;
 }
 .chart-title {
-  font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: 650;
   color: var(--ink);
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
 }
 .chart {
   height: 300px;
 }
 
 @media (max-width: 900px) {
+  .dashboard-intro {
+    align-items: start;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .intro-copy {
+    text-align: left;
+  }
   .stat-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -275,6 +351,15 @@ onBeforeUnmount(() => {
   }
   .chart-card--wide {
     grid-column: span 1;
+  }
+}
+
+@media (max-width: 520px) {
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
+  .intro-title {
+    font-size: 25px;
   }
 }
 </style>

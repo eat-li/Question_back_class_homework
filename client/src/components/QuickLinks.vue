@@ -90,7 +90,7 @@ const remove = (i: number) => {
 <style scoped>
 .quick-links {
   padding: 12px 16px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
   max-height: 220px;
   overflow-y: auto;
 }
@@ -102,16 +102,16 @@ const remove = (i: number) => {
 }
 .ql-title {
   font-size: 12px;
-  color: var(--ink-soft);
-  letter-spacing: 0.08em;
+  color: rgba(238, 246, 241, 0.52);
+  letter-spacing: 0;
 }
 .ql-add {
   width: 20px;
   height: 20px;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   background: transparent;
   border-radius: 6px;
-  color: var(--moss-deep);
+  color: rgba(255, 255, 255, 0.72);
   cursor: pointer;
   line-height: 1;
   font-size: 15px;
@@ -121,11 +121,11 @@ const remove = (i: number) => {
   justify-content: center;
 }
 .ql-add:hover {
-  background: var(--moss-soft);
+  background: rgba(255, 255, 255, 0.08);
 }
 .ql-empty {
   font-size: 12px;
-  color: var(--ink-soft);
+  color: rgba(238, 246, 241, 0.46);
   opacity: 0.6;
 }
 .ql-item {
@@ -138,14 +138,14 @@ const remove = (i: number) => {
   flex: 1;
   min-width: 0;
   font-size: 13px;
-  color: var(--ink);
+  color: rgba(255, 255, 255, 0.76);
   text-decoration: none;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .ql-name:hover {
-  color: var(--moss-deep);
+  color: #fff;
 }
 .ql-del {
   width: 18px;

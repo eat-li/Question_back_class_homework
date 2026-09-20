@@ -6,6 +6,7 @@ const { cacheGet, cacheSet, cacheDel } = require('../utils/cache')
 
 // 知识点标签变化不频繁，加短 TTL 缓存
 const TAGS_TTL = 10000
+const DEFAULT_LIST_LIMIT = Number(process.env.DEFAULT_LIST_LIMIT) || 1000
 
 const TYPES = ['choice', 'fill', 'solve']
 
@@ -89,7 +90,7 @@ exports.list = async (req, res, next) => {
       return ok(res, { list: rows, total: count, page: pageNum, pageSize: size })
     }
 
-    const list = await Question.findAll({ where, order })
+    const list = await Question.findAll({ where, order, limit: DEFAULT_LIST_LIMIT })
     ok(res, list)
   } catch (e) {
     next(e)

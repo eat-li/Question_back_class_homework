@@ -98,7 +98,7 @@ pnpm dev
 ```
 
 - 前端：http://localhost:5173
-- 后端：http://localhost:4300
+- 后端：http://localhost:3000
 
 也可以分别启动：
 
@@ -143,6 +143,14 @@ pnpm dev:server
 - Token 默认有效期 7 天
 - 前端登录后自动携带 Token
 - Token 失效会自动跳转到登录页
+- 生产环境必须配置非默认 `AUTH_SECRET`，否则后端会拒绝启动
+
+## 安全与性能配置
+
+- `AI_ALLOWED_BASE_URLS` 用于限制 AI 排版接口可访问的 OpenAI 兼容服务地址，避免后端被当作任意请求代理。
+- `DEFAULT_LIST_LIMIT` 用于限制未传分页参数的列表接口最大返回量，默认 1000。
+- `CACHE_MAX_ENTRIES` 用于限制进程内缓存条目数量，默认 200。
+- `DB_POOL_*` 可按部署机器调整数据库连接池大小与超时时间。
 
 ## 家长端预留
 

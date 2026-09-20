@@ -1,72 +1,51 @@
-// 轻量 HTML 消毒工具：用于富文本展示和打印前，移除脚本、事件属性、危险协议等。
-// 适用于本地教师工具；如后续需要更严格的策略，可替换为 DOMPurify。
+import DOMPurify from 'dompurify'
 
-const ALLOWED_TAGS = new Set([
-  'P',
-  'BR',
-  'HR',
-  'DIV',
-  'SPAN',
-  'STRONG',
-  'B',
-  'EM',
-  'I',
-  'U',
-  'S',
-  'STRIKE',
-  'UL',
-  'OL',
-  'LI',
-  'BLOCKQUOTE',
-  'CODE',
-  'PRE',
-  'H1',
-  'H2',
-  'H3',
-  'H4',
-  'H5',
-  'H6',
-  'IMG',
-  'A',
-  'TABLE',
-  'THEAD',
-  'TBODY',
-  'TFOOT',
-  'TR',
-  'TH',
-  'TD',
-  'SUB',
-  'SUP',
-  'FIGURE',
-  'FIGCAPTION',
-  'SECTION',
-  'HEADER',
-  'FOOTER',
-  'ARTICLE',
-  'MAIN'
-])
+const ALLOWED_TAGS = [
+  'p',
+  'br',
+  'hr',
+  'div',
+  'span',
+  'strong',
+  'b',
+  'em',
+  'i',
+  'u',
+  's',
+  'strike',
+  'ul',
+  'ol',
+  'li',
+  'blockquote',
+  'code',
+  'pre',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'img',
+  'a',
+  'table',
+  'thead',
+  'tbody',
+  'tfoot',
+  'tr',
+  'th',
+  'td',
+  'sub',
+  'sup',
+  'figure',
+  'figcaption',
+  'section',
+  'header',
+  'footer',
+  'article',
+  'main'
+]
 
-const DANGEROUS_TAGS = new Set([
-  'SCRIPT',
-  'STYLE',
-  'IFRAME',
-  'OBJECT',
-  'EMBED',
-  'LINK',
-  'META',
-  'NOSCRIPT',
-  'TEMPLATE',
-  'FORM',
-  'INPUT',
-  'BUTTON',
-  'TEXTAREA',
-  'SELECT',
-  'OPTION',
-  'VIDEO',
-  'AUDIO'
-])
-
-const ALLOWED_ATTRS = new Set([
+const ALLOWED_ATTR = [
   'href',
   'src',
   'alt',
@@ -81,54 +60,55 @@ const ALLOWED_ATTRS = new Set([
   'rowspan',
   'start',
   'type'
-])
+]
 
-export function sanitizeHtml(html: string): string {
+export interface SanitizeHtmlOptions {
+  allowStyle?: boolean
+}
+
+function scrubStyleValues(html: string): string {
   if (!html || typeof document === 'undefined') return html || ''
-
   const template = document.createElement('template')
   template.innerHTML = html
-
-  const elements = Array.from(template.content.querySelectorAll('*'))
-  for (const el of elements) {
-    const tag = el.tagName.toUpperCase()
-
-    // 危险标签直接删除
-    if (DANGEROUS_TAGS.has(tag)) {
-      el.remove()
-      continue
-    }
-
-    // 非白名单标签：保留子内容，去掉标签本身
-    if (!ALLOWED_TAGS.has(tag)) {
-      el.replaceWith(...Array.from(el.childNodes))
-      continue
-    }
-
-    // 清理属性：只保留白名单属性，去掉 on* 和危险协议
-    for (const attr of Array.from(el.attributes)) {
-      const name = attr.name.toLowerCase()
-      if (!ALLOWED_ATTRS.has(name) || name.startsWith('on')) {
-        el.removeAttribute(attr.name)
-        continue
-      }
-
-      const value = attr.value.trim().toLowerCase()
-      if (
-        (name === 'href' || name === 'src' || name === 'style') &&
-        (value.includes('javascript:') ||
-          value.includes('expression(') ||
-          value.includes('vbscript:'))
-      ) {
-        el.removeAttribute(attr.name)
-        continue
-      }
-      if (name === 'src' && value.startsWith('data:') && !value.startsWith('data:image/')) {
-        el.removeAttribute(attr.name)
-        continue
-      }
-    }
+  for (const el of Array.from(template.content.querySelectorAll<HTMLElement>('[style]'))) {
+    const style = el.getAttribute('style') || ''
+    const unsafe =
+      /(?:javascript\s*:|vbscript\s*:|expression\s*\(|url\s*\(\s*['"]?\s*(?:javascript|vbscript)\s*:)/i
+    if (unsafe.test(style)) el.removeAttribute('style')
   }
-
   return template.innerHTML
 }
+
+export function sanitizeHtml(html: string, options: SanitizeHtmlOptions = {}): string {
+  if (!html || typeof window === 'undefined') return html || ''
+
+  const allowStyle = options.allowStyle !== false
+  const clean = DOMPurify.sanitize(html, {
+    ALLOWED_TAGS,
+    ALLOWED_ATTR: allowStyle ? ALLOWED_ATTR : ALLOWED_ATTR.filter((attr) => attr !== 'style'),
+    ALLOW_DATA_ATTR: false,
+    ADD_ATTR: ['target'],
+    FORBID_TAGS: [
+      'script',
+      'style',
+      'iframe',
+      'object',
+      'embed',
+      'link',
+      'meta',
+      'template',
+      'form',
+      'input',
+      'button',
+      'textarea',
+      'select',
+      'option',
+      'video',
+      'audio'
+    ]
+  })
+
+  return allowStyle ? scrubStyleValues(clean) : clean
+}
+
+export const sanitizeRichHtml = (html: string): string => sanitizeHtml(html, { allowStyle: false })

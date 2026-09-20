@@ -12,6 +12,7 @@ body,
 
 html {
   background: var(--paper);
+  scroll-behavior: smooth;
 }
 
 body {
@@ -21,18 +22,31 @@ body {
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  letter-spacing: 0;
 }
 
-/* 卡片：柔和书卷质感 */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+::selection {
+  color: #fff;
+  background: var(--moss);
+}
+
 .el-card {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow-soft);
-  background: #fffdf9;
-  transition: box-shadow 0.25s ease;
+  background: var(--surface);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 .el-card:hover {
-  box-shadow: var(--shadow-hover);
+  border-color: var(--line-strong);
 }
 .el-card__body {
   padding: 20px 22px;
@@ -45,7 +59,7 @@ body {
 }
 .el-table th.el-table__cell {
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
 }
 .el-table .el-table__cell {
   padding: 12px 0;
@@ -62,14 +76,13 @@ body {
   padding-bottom: 16px;
 }
 .el-dialog__title {
-  font-family: var(--font-display);
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 /* 抽屉圆角 */
 .el-drawer {
-  background: #fffdf9;
+  background: var(--surface);
 }
 
 /* 消息提示圆角 */
@@ -96,6 +109,12 @@ body {
   vertical-align: middle;
   line-height: 1;
 }
+.el-button--primary {
+  box-shadow: 0 2px 8px rgba(36, 72, 63, 0.16);
+}
+.el-button.is-link {
+  box-shadow: none;
+}
 .el-button:not(.is-disabled):hover {
   transform: translateY(-1px);
 }
@@ -110,7 +129,23 @@ body {
 /* 输入框聚焦态更柔和 */
 .el-input__wrapper,
 .el-textarea__inner {
-  transition: box-shadow 0.2s ease;
+  transition:
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.el-input__wrapper,
+.el-select__wrapper,
+.el-textarea__inner {
+  background: var(--surface);
+}
+
+.el-pagination {
+  font-variant-numeric: tabular-nums;
+}
+
+.el-tag {
+  border-radius: 3px;
 }
 
 /* 空态描述文字使用次级色 */
@@ -140,13 +175,13 @@ body {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d9cfbc;
+  background: #b9c3bc;
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #c7bba4;
+  background: #929f97;
   background-clip: content-box;
 }
 ::-webkit-scrollbar-track {

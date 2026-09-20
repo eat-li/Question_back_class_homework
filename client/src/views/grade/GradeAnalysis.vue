@@ -97,10 +97,10 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { Search, Download, Printer } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { getStudents } from '../../api/student'
-import { getGrades, getGradeSummary, type GradeSummary } from '../../api/grade'
+import { getGrades, getGradeSummary } from '../../api/grade'
 import { escapeHtml } from '../../utils/printHtml'
 import { useECharts } from '../../composables/useECharts'
-import type { Student } from '../../types'
+import type { GradeSummary, GradeTrendPoint, Student } from '../../types'
 
 const examTypes = [
   { value: 'final', label: '期末' },
@@ -108,7 +108,7 @@ const examTypes = [
   { value: 'quiz', label: '小测' },
   { value: 'popquiz', label: '随堂测验' }
 ]
-const palette = ['#5b7d74', '#c2a878', '#8a9bb0', '#a06a5a', '#6b8f5a', '#8f7aa8']
+const palette = ['#2f6658', '#a47732', '#b24c3d', '#6c7a58', '#58736a', '#8d6848']
 
 const examTypeLabel = (t: string) => examTypes.find((x) => x.value === t)?.label || t
 
@@ -143,7 +143,9 @@ const feedbackSummary = computed(() => {
     const pts = t.points || []
     if (pts.length < 1) continue
     const avg =
-      Math.round((pts.reduce((s: number, p: any) => s + p.percent, 0) / pts.length) * 10) / 10
+      Math.round(
+        (pts.reduce((s: number, p: GradeTrendPoint) => s + p.percent, 0) / pts.length) * 10
+      ) / 10
     if (pts.length < 2) {
       parts.push(`${t.subject} 目前仅 1 次记录，${pts[0].percent}%`)
       continue
@@ -167,9 +169,9 @@ const buildFilters = () => ({
 const renderTrend = () => {
   if (!trendRef.value || !summary.value.trend.length) return
   const labels: string[] = []
-  const seriesMap = new Map<string, Map<string, any>>()
+  const seriesMap = new Map<string, Map<string, GradeTrendPoint>>()
   for (const t of summary.value.trend) {
-    const m = new Map<string, any>()
+    const m = new Map<string, GradeTrendPoint>()
     for (const p of t.points) {
       if (!labels.includes(p.date)) labels.push(p.date)
       m.set(p.date, p)
@@ -330,7 +332,7 @@ const renderPie = () => {
   const chart = initChart(pieRef.value, {
     tooltip: { trigger: 'item', formatter: '{b}: {c} 人次 ({d}%)' },
     legend: { bottom: 0, icon: 'circle' },
-    color: ['#5b7d74', '#8a9bb0', '#c2a878', '#a06a5a'],
+    color: ['#2f6658', '#6c7a58', '#a47732', '#b24c3d'],
     series: [
       {
         type: 'pie',

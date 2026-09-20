@@ -6,6 +6,7 @@ const { cacheGet, cacheSet, cacheDelByPrefix } = require('../utils/cache')
 
 // 汇总聚合结果变化不频繁，加短 TTL 缓存降低数据库压力
 const SUMMARY_TTL = 10000
+const DEFAULT_LIST_LIMIT = Number(process.env.DEFAULT_LIST_LIMIT) || 1000
 
 const EXAM_TYPES = ['final', 'mid', 'quiz', 'popquiz']
 
@@ -67,7 +68,8 @@ exports.list = async (req, res, next) => {
       order: [
         ['examDate', 'DESC'],
         ['id', 'DESC']
-      ]
+      ],
+      limit: DEFAULT_LIST_LIMIT
     })
     ok(res, list)
   } catch (e) {

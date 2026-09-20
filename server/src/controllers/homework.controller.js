@@ -1,4 +1,5 @@
 // 作业与成绩控制器
+const { Op } = require('sequelize')
 const {
   sequelize,
   Homework,
@@ -12,6 +13,7 @@ const { ok, fail } = require('../utils/response')
 const { cacheDel } = require('../utils/cache')
 
 const STATUSES = ['draft', 'published', 'closed']
+const DEFAULT_LIST_LIMIT = Number(process.env.DEFAULT_LIST_LIMIT) || 1000
 
 const normalizeIdArray = (value) => {
   if (value === undefined) return undefined
@@ -47,28 +49,51 @@ const validate = (payload, { partial = false } = {}) => {
 
 // 把关联表数据挂回 homework 实例，保持前端兼容 questionIds / studentIds 数组
 async function attachRelationsToInstance(homework) {
+  await attachRelationsToInstances([homework])
+  return homework
+}
+
+async function attachRelationsToInstances(homeworks) {
+  const ids = homeworks.map((h) => h.id).filter(Boolean)
+  if (!ids.length) return homeworks
+
   const [questions, students] = await Promise.all([
     HomeworkQuestion.findAll({
-      where: { homeworkId: homework.id },
+      where: { homeworkId: { [Op.in]: ids } },
       order: [
+        ['homeworkId', 'ASC'],
         ['sort', 'ASC'],
         ['id', 'ASC']
       ]
     }),
     HomeworkStudent.findAll({
-      where: { homeworkId: homework.id },
-      order: [['id', 'ASC']]
+      where: { homeworkId: { [Op.in]: ids } },
+      order: [
+        ['homeworkId', 'ASC'],
+        ['id', 'ASC']
+      ]
     })
   ])
-  homework.setDataValue(
-    'questionIds',
-    questions.map((h) => h.questionId)
-  )
-  homework.setDataValue(
-    'studentIds',
-    students.map((h) => h.studentId)
-  )
-  return homework
+
+  const questionsByHomework = new Map()
+  for (const relation of questions) {
+    if (!questionsByHomework.has(relation.homeworkId))
+      questionsByHomework.set(relation.homeworkId, [])
+    questionsByHomework.get(relation.homeworkId).push(relation.questionId)
+  }
+
+  const studentsByHomework = new Map()
+  for (const relation of students) {
+    if (!studentsByHomework.has(relation.homeworkId))
+      studentsByHomework.set(relation.homeworkId, [])
+    studentsByHomework.get(relation.homeworkId).push(relation.studentId)
+  }
+
+  for (const homework of homeworks) {
+    homework.setDataValue('questionIds', questionsByHomework.get(homework.id) || [])
+    homework.setDataValue('studentIds', studentsByHomework.get(homework.id) || [])
+  }
+  return homeworks
 }
 
 async function replaceHomeworkQuestions(homeworkId, questionIds, transaction) {
@@ -109,12 +134,12 @@ exports.list = async (req, res, next) => {
         limit: size,
         offset: (pageNum - 1) * size
       })
-      await Promise.all(rows.map((h) => attachRelationsToInstance(h)))
+      await attachRelationsToInstances(rows)
       return ok(res, { list: rows, total: count, page: pageNum, pageSize: size })
     }
 
-    const list = await Homework.findAll({ where, order })
-    await Promise.all(list.map((h) => attachRelationsToInstance(h)))
+    const list = await Homework.findAll({ where, order, limit: DEFAULT_LIST_LIMIT })
+    await attachRelationsToInstances(list)
     ok(res, list)
   } catch (e) {
     next(e)

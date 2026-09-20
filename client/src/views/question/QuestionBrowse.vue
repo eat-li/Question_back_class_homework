@@ -56,9 +56,7 @@
             {{ '★'.repeat(q.difficulty || 0) || '—' }}
           </span>
           <span v-if="q.knowledgeTag" class="q-tag">{{ q.knowledgeTag }}</span>
-          <span v-if="q.knowledgeSubTag" class="q-tag q-tag--sub">{{
-            q.knowledgeSubTag
-          }}</span>
+          <span v-if="q.knowledgeSubTag" class="q-tag q-tag--sub">{{ q.knowledgeSubTag }}</span>
         </div>
 
         <div class="q-title" @click="onContentClick"><RichContent :html="q.title || ''" /></div>
@@ -296,8 +294,8 @@ onMounted(() => {
   color: #a8874a;
 }
 .type-solve {
-  background: #e9edf3;
-  color: #5b6b82;
+  background: #e7ebe3;
+  color: #56634d;
 }
 .q-diff {
   color: var(--accent);

@@ -2,7 +2,11 @@
   <div class="login-page">
     <!-- 备课草稿纸氛围：数学符号水印（纯装饰，不参与交互/朗读） -->
     <div class="login-art" aria-hidden="true">
-      <svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+      <svg
+        viewBox="0 0 1440 900"
+        preserveAspectRatio="xMidYMid slice"
+        xmlns="http://www.w3.org/2000/svg"
+      >
         <g font-family="Georgia, 'Times New Roman', 'Songti SC', serif">
           <text x="96" y="214" font-size="150" fill="rgba(91,125,116,0.14)">∫</text>
           <text x="1190" y="168" font-size="122" fill="rgba(91,125,116,0.12)">∑</text>
@@ -19,7 +23,10 @@
           <path d="M 1030 480 H 1300" stroke-width="1.5" opacity="0.7" />
           <path d="M 1060 300 V 540" stroke-width="1.5" opacity="0.7" />
           <!-- 正弦波 -->
-          <path d="M 300 626 q 45 -70 90 0 q 45 70 90 0 q 45 -70 90 0 q 45 70 90 0 q 45 -70 90 0" stroke-width="2" />
+          <path
+            d="M 300 626 q 45 -70 90 0 q 45 70 90 0 q 45 -70 90 0 q 45 70 90 0 q 45 -70 90 0"
+            stroke-width="2"
+          />
           <!-- 圆弧 -->
           <path d="M 196 660 a 44 44 0 1 1 0.01 0" stroke-width="1.5" opacity="0.8" />
           <path d="M 196 660 m -20 0 a 64 64 0 1 1 40 0" stroke-width="1.5" opacity="0.8" />
@@ -102,7 +109,8 @@ const submit = async () => {
     localStorage.setItem(TOKEN_KEY, res.token)
     // 回跳登录前所在页面（如 401 被踢 / 未登录直接访问），避免操作现场丢失
     const redirect = route.query.redirect ? String(route.query.redirect) : ''
-    const target = redirect && redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/'
+    const target =
+      redirect && redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/'
     router.replace(target)
   } catch {
     // 错误提示已由 request.ts 统一弹出
@@ -119,10 +127,7 @@ const submit = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background:
-    radial-gradient(1100px 560px at 88% -10%, rgba(194, 168, 120, 0.1), transparent 62%),
-    radial-gradient(980px 680px at -8% 112%, rgba(91, 125, 116, 0.12), transparent 62%),
-    var(--paper);
+  background: var(--paper);
   overflow: hidden;
 }
 
@@ -135,8 +140,7 @@ const submit = async () => {
     linear-gradient(rgba(91, 125, 116, 0.05) 1px, transparent 1px),
     linear-gradient(90deg, rgba(91, 125, 116, 0.05) 1px, transparent 1px);
   background-size: 28px 28px;
-  mask-image: radial-gradient(1200px 760px at 50% 42%, #000 30%, transparent 78%);
-  -webkit-mask-image: radial-gradient(1200px 760px at 50% 42%, #000 30%, transparent 78%);
+  opacity: 0.72;
   pointer-events: none;
 }
 
@@ -161,6 +165,7 @@ const submit = async () => {
 .login-card {
   width: 400px;
   padding: 26px 12px 20px;
+  border-top: 3px solid var(--moss-deep);
   animation: rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 @keyframes rise {
@@ -191,31 +196,31 @@ const submit = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 13px;
-  background: var(--moss);
+  border-radius: 5px;
+  background: var(--moss-deep);
   color: #fffdf9;
   font-family: var(--font-display);
   font-size: 27px;
   font-weight: 700;
-  box-shadow: 0 4px 12px rgba(91, 125, 116, 0.35);
+  box-shadow: 0 4px 12px rgba(36, 72, 63, 0.22);
 }
 .login-title {
   font-family: var(--font-display);
   font-size: 22px;
   font-weight: 700;
   color: var(--ink);
-  letter-spacing: 0.03em;
+  letter-spacing: 0;
 }
 .login-sub {
   margin-top: 3px;
   font-size: 12px;
   color: var(--ink-soft);
-  letter-spacing: 0.1em;
+  letter-spacing: 0;
 }
 
 .login-rule {
   height: 1px;
-  background: linear-gradient(90deg, transparent, var(--line) 22%, var(--line) 78%, transparent);
+  background: var(--line);
   margin: 20px 0 18px;
 }
 
@@ -223,7 +228,7 @@ const submit = async () => {
   font-family: var(--font-display);
   font-size: 13px;
   color: var(--ink-soft);
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
   margin-bottom: 14px;
   text-align: center;
 }

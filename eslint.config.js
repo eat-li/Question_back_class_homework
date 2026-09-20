@@ -21,6 +21,7 @@ module.exports = [
         setInterval: 'readonly',
         clearInterval: 'readonly',
         __dirname: 'readonly',
+        URL: 'readonly',
         fetch: 'readonly',
         AbortController: 'readonly'
       }

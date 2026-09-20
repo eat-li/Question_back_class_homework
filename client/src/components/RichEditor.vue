@@ -157,13 +157,19 @@
           <el-dropdown-menu>
             <el-dropdown-item command="markdown">粘贴 Markdown 表格</el-dropdown-item>
             <el-dropdown-item command="blank">插入空表格 3×3</el-dropdown-item>
-            <el-dropdown-item v-if="inTable" command="rowAfter" divided>下方插入行</el-dropdown-item>
+            <el-dropdown-item v-if="inTable" command="rowAfter" divided
+              >下方插入行</el-dropdown-item
+            >
             <el-dropdown-item v-if="inTable" command="rowBefore">上方插入行</el-dropdown-item>
             <el-dropdown-item v-if="inTable" command="colAfter">右侧插入列</el-dropdown-item>
             <el-dropdown-item v-if="inTable" command="colBefore">左侧插入列</el-dropdown-item>
-            <el-dropdown-item v-if="inTable" command="deleteRow" divided>删除当前行</el-dropdown-item>
+            <el-dropdown-item v-if="inTable" command="deleteRow" divided
+              >删除当前行</el-dropdown-item
+            >
             <el-dropdown-item v-if="inTable" command="deleteCol">删除当前列</el-dropdown-item>
-            <el-dropdown-item v-if="inTable" command="deleteTable" divided>删除表格</el-dropdown-item>
+            <el-dropdown-item v-if="inTable" command="deleteTable" divided
+              >删除表格</el-dropdown-item
+            >
           </el-dropdown-menu>
         </template>
       </el-dropdown>
@@ -334,9 +340,13 @@ import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
 import { uploadImage } from '../api/upload'
 import { getAiConfig, formatQuestion } from '../api/ai'
 import { loadAiConfig } from '../utils/aiConfig'
-import { sanitizeHtml } from '../utils/sanitizeHtml'
+import { sanitizeRichHtml } from '../utils/sanitizeHtml'
 import { markdownTableToHtml } from '../utils/markdownTable'
-import { normalizeMathDelimiters, textToParagraphsHtml, renderMathInHtml } from '../utils/mathRender'
+import {
+  normalizeMathDelimiters,
+  textToParagraphsHtml,
+  renderMathInHtml
+} from '../utils/mathRender'
 import { normalizeAiMathHtml, validateAiMath } from '../utils/aiMath'
 
 const props = defineProps<{ modelValue: string }>()
@@ -367,7 +377,7 @@ const onAiCommand = (cmd: string) => {
 }
 
 // 预览渲染：消毒 + 公式渲染
-const renderPreviewHtml = (html: string) => renderMathInHtml(sanitizeHtml(html || ''))
+const renderPreviewHtml = (html: string) => renderMathInHtml(sanitizeRichHtml(html || ''))
 
 // 打开预览对话框（original 为当前编辑器内容，result 为处理结果）
 const openAiPreview = (title: string, resultHtml: string, canRetry: boolean) => {
@@ -443,7 +453,10 @@ const runAiFormat = async () => {
 // 发起 AI 请求（含超时提示与进度反馈）；失败返回 false
 const requestAiFormat = async (payload: any): Promise<boolean> => {
   aiLoading.value = true
-  const loading = ElLoading.service({ text: 'AI 排版中（可能需要 1-2 分钟）…', background: 'rgba(0,0,0,0.3)' })
+  const loading = ElLoading.service({
+    text: 'AI 排版中（可能需要 1-2 分钟）…',
+    background: 'rgba(0,0,0,0.3)'
+  })
   const t0 = Date.now()
   const timer = setInterval(() => {
     loading.setText(`AI 排版中… ${Math.round((Date.now() - t0) / 1000)}s`)
@@ -452,7 +465,7 @@ const requestAiFormat = async (payload: any): Promise<boolean> => {
     const { html } = await formatQuestion(payload)
     // 先做本地规范化（Unicode 符号 / 定界符），再预览
     const { html: normalized } = normalizeAiMathHtml(html || '')
-    const safe = sanitizeHtml(normalized)
+    const safe = sanitizeRichHtml(normalized)
     if (!safe.trim()) {
       ElMessage.warning('AI 未返回有效内容')
       return false
@@ -489,7 +502,7 @@ const retryAiFormat = () => {
 const applyAiResult = () => {
   aiApplying.value = true
   try {
-    editor.value?.commands.setContent(sanitizeHtml(aiDialog.rawHtml), false)
+    editor.value?.commands.setContent(sanitizeRichHtml(aiDialog.rawHtml), false)
     // ⚠️ setContent 默认 emitUpdate=false，不会触发 onUpdate → v-model 不更新，
     // 保存时会提交排版前的内容。必须手动把新内容同步给父组件（form.title）。
     emit('update:modelValue', editor.value?.getHTML() || '')

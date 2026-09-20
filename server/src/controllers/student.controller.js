@@ -4,6 +4,8 @@ const { Student } = require('../models')
 const { ok, fail } = require('../utils/response')
 const { cacheDel } = require('../utils/cache')
 
+const DEFAULT_LIST_LIMIT = Number(process.env.DEFAULT_LIST_LIMIT) || 1000
+
 // 字段白名单：只允许写入模型定义中允许的字段，并做基本长度归一化
 const pick = (body = {}) => {
   const out = {}
@@ -44,7 +46,7 @@ exports.list = async (req, res, next) => {
       return ok(res, { list: rows, total: count, page: pageNum, pageSize: size })
     }
 
-    const list = await Student.findAll({ where, order })
+    const list = await Student.findAll({ where, order, limit: DEFAULT_LIST_LIMIT })
     ok(res, list)
   } catch (e) {
     next(e)

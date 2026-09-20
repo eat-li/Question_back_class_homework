@@ -17,6 +17,26 @@
         title="后端已配置 AI API Key，前端可以留空 API Key"
         style="margin-bottom: 16px"
       />
+      <el-alert
+        type="info"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 16px"
+        title="接口地址需在后端白名单内，否则排版会报「不在允许列表」"
+      >
+        <div class="allow-list">
+          当前允许：
+          <span v-if="backendConfig.allowedBaseUrls?.length">{{
+            backendConfig.allowedBaseUrls.join('　')
+          }}</span>
+          <span v-else>（后端未返回，默认仅 DeepSeek / OpenAI 官方地址）</span>
+        </div>
+        <div class="allow-list allow-list--hint">
+          要用其它中转/自建地址：在 <code>server/.env</code> 里把它加到
+          <code>AI_ALLOWED_BASE_URLS</code>（逗号分隔），或直接设
+          <code>AI_ALLOW_ANY_BASE_URL=true</code> 放行任意 https 地址，改完重启后端。
+        </div>
+      </el-alert>
       <el-form label-width="100px" style="max-width: 560px">
         <el-form-item label="API Key">
           <el-input
@@ -62,10 +82,16 @@ import { getAiConfig } from '../../api/ai'
 import { loadAiConfig, saveAiConfig, clearAiConfig } from '../../utils/aiConfig'
 
 const form = reactive({ apiKey: '', baseUrl: '', model: '' })
-const backendConfig = ref<{ hasBackendKey: boolean; baseUrl: string; model: string }>({
+const backendConfig = ref<{
+  hasBackendKey: boolean
+  baseUrl: string
+  model: string
+  allowedBaseUrls?: string[]
+}>({
   hasBackendKey: false,
   baseUrl: '',
-  model: ''
+  model: '',
+  allowedBaseUrls: []
 })
 
 onMounted(async () => {
@@ -130,5 +156,21 @@ const reset = () => {
   color: var(--ink-soft);
   font-size: 12px;
   opacity: 0.7;
+}
+/* 接口地址白名单说明 */
+.allow-list {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.8;
+  word-break: break-all;
+}
+.allow-list--hint {
+  opacity: 0.8;
+}
+.allow-list code {
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.06);
+  font-size: 12px;
 }
 </style>

@@ -1,7 +1,18 @@
 // 管理员登录认证：基于 HMAC 签名的 Token，不依赖额外 npm 包
 const crypto = require('crypto')
 
-const SECRET = process.env.AUTH_SECRET || 'dev-only-change-me'
+const DEFAULT_SECRET = 'dev-only-change-me'
+const SECRET = process.env.AUTH_SECRET || DEFAULT_SECRET
+
+function assertAuthSecretConfigured() {
+  const secret = String(process.env.AUTH_SECRET || '').trim()
+  if (process.env.NODE_ENV === 'production' && (!secret || secret === DEFAULT_SECRET)) {
+    throw new Error('生产环境必须配置 AUTH_SECRET，且不能使用默认开发密钥')
+  }
+  if (!secret) {
+    console.warn('⚠️ 当前使用默认开发 AUTH_SECRET，请勿用于生产环境')
+  }
+}
 
 function sign(payload) {
   const data = Buffer.from(JSON.stringify(payload)).toString('base64url')
@@ -71,4 +82,4 @@ function requireReadonly(req, res, next) {
   next()
 }
 
-module.exports = { sign, verify, requireAuth, requireReadonly }
+module.exports = { sign, verify, requireAuth, requireReadonly, assertAuthSecretConfigured }

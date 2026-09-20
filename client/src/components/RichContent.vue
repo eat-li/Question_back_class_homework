@@ -4,13 +4,13 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { sanitizeHtml } from '../utils/sanitizeHtml'
+import { sanitizeRichHtml } from '../utils/sanitizeHtml'
 import { renderMathInHtml } from '../utils/mathRender'
 
 const props = defineProps<{ html: string }>()
 
 // 消毒后再做字符串级 KaTeX 渲染：$...$ / $$...$$ 跨 <br> 也能正确匹配
-const safeHtml = computed(() => renderMathInHtml(sanitizeHtml(props.html || '')))
+const safeHtml = computed(() => renderMathInHtml(sanitizeRichHtml(props.html || '')))
 </script>
 
 <style scoped>
