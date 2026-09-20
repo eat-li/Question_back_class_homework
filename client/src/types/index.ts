@@ -26,7 +26,7 @@ export interface Question {
   knowledgeTag?: string | null
   knowledgeSubTag?: string | null
   body?: string | null
-  options?: any[] | null
+  options?: Array<string | Record<string, unknown>> | null
   answer?: string | null
   createdAt?: string
   updatedAt?: string
@@ -92,6 +92,80 @@ export interface GradeCard {
     ExamScore,
     'id' | 'studentId' | 'examType' | 'subject' | 'score' | 'fullScore' | 'examDate' | 'comment'
   > | null
+}
+
+export interface GradeTrendPoint {
+  date: string
+  examType: ExamType
+  score: number
+  fullScore: number
+  percent: number
+}
+
+export interface GradeTrend {
+  subject: string
+  points: GradeTrendPoint[]
+}
+
+export interface GradeRadarItem {
+  subject: string
+  avgPercent: number
+  count: number
+}
+
+export interface GradeDistributionItem {
+  key: 'excellent' | 'good' | 'pass' | 'fail'
+  label: string
+  count: number
+}
+
+export interface GradeCompareItem {
+  studentId: number
+  name: string
+  grade?: string | null
+  avgPercent: number
+  count: number
+}
+
+export interface GradeSummary {
+  trend: GradeTrend[]
+  radar: GradeRadarItem[]
+  distribution: GradeDistributionItem[]
+  compare: GradeCompareItem[]
+}
+
+export interface AiConfig {
+  hasBackendKey: boolean
+  baseUrl: string
+  model: string
+  allowedBaseUrls?: string[]
+}
+
+export interface AiFormatPayload {
+  text: string
+  apiKey?: string
+  baseUrl?: string
+  model?: string
+}
+
+export interface AiFormatResult {
+  html: string
+}
+
+/** 课时总结的 AI 生成入参（学生/时间由前端补充，这里传作业与可用凭据） */
+export interface AiLessonSummaryPayload {
+  homeworkId: number
+  studentId?: number | null
+  extraNotes?: string
+  apiKey?: string
+  baseUrl?: string
+  model?: string
+}
+
+export interface AiLessonSummaryResult {
+  content: string
+  classStatus: string
+  homeworkTask: string
 }
 
 export interface KnowledgeCategory {

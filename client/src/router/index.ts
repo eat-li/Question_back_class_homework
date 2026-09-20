@@ -70,6 +70,12 @@ const router = createRouter({
           meta: { title: '作业管理' }
         },
         {
+          path: 'summaries',
+          name: 'summaries',
+          component: () => import('../views/homework/SummaryList.vue'),
+          meta: { title: '课时总结' }
+        },
+        {
           path: 'homework-view',
           name: 'homeworkView',
           component: () => import('../views/homework/HomeworkView.vue'),

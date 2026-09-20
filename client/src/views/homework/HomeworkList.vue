@@ -23,9 +23,10 @@
           }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="400">
+      <el-table-column label="操作" width="490">
         <template #default="{ row }">
           <el-button size="small" :icon="EditPen" @click="openEdit(row)">编辑</el-button>
+          <el-button size="small" :icon="Notebook" @click="openSummary(row)">课时总结</el-button>
           <el-button size="small" :icon="Edit" @click="openScore(row)">打分</el-button>
           <el-button size="small" type="primary" :icon="Download" @click="openExport(row)"
             >导出 PDF</el-button
@@ -48,11 +49,7 @@
   </el-card>
 
   <!-- 发布 / 编辑作业 -->
-  <el-dialog
-    v-model="createVisible"
-    :title="editingId ? '编辑作业' : '发布作业'"
-    width="560px"
-  >
+  <el-dialog v-model="createVisible" :title="editingId ? '编辑作业' : '发布作业'" width="560px">
     <el-form :model="form" label-width="80px">
       <el-form-item label="标题"><el-input v-model="form.title" /></el-form-item>
       <el-form-item label="选择题目">
@@ -62,10 +59,7 @@
             <el-radio-button value="single">单选</el-radio-button>
           </el-radio-group>
           <el-button size="small" type="primary" @click="openPicker">抽题</el-button>
-          <el-button
-            size="small"
-            :disabled="!(form.questionIds || []).length"
-            @click="openSelected"
+          <el-button size="small" :disabled="!(form.questionIds || []).length" @click="openSelected"
             >查看 / 排序</el-button
           >
           <span class="picked-count">已选 {{ (form.questionIds || []).length }} 题</span>
@@ -242,7 +236,9 @@
         :key="q.id"
         class="sel-row"
         :class="{ 'is-dragging': dragIndex === i, 'is-picked': swapIndex === i }"
-        :title="swapIndex === null ? '点击选中该题，再点另一题即可交换顺序' : '点击与选中题目交换位置'"
+        :title="
+          swapIndex === null ? '点击选中该题，再点另一题即可交换顺序' : '点击与选中题目交换位置'
+        "
         @click="onSelRowClick(i)"
         @dragover.prevent="onSelDragOver(i)"
         @drop.prevent="onSelDrop"
@@ -261,12 +257,9 @@
           <RichContent class="sel-title" :html="q.title || ''" />
           <div class="sel-tags">
             <el-tag size="small" type="info">{{ typeLabel(q.type) }}</el-tag>
-            <el-tag size="small" type="warning">{{
-              '★'.repeat(q.difficulty || 0) || '—'
-            }}</el-tag>
+            <el-tag size="small" type="warning">{{ '★'.repeat(q.difficulty || 0) || '—' }}</el-tag>
             <el-tag v-if="q.knowledgeTag" size="small"
-              >{{ q.knowledgeTag
-              }}{{ q.knowledgeSubTag ? ' › ' + q.knowledgeSubTag : '' }}</el-tag
+              >{{ q.knowledgeTag }}{{ q.knowledgeSubTag ? ' › ' + q.knowledgeSubTag : '' }}</el-tag
             >
           </div>
         </div>
@@ -338,9 +331,12 @@
           typeLabel(currentQuestion.type)
         }}</el-descriptions-item>
         <el-descriptions-item label="难度">{{ currentQuestion.difficulty }}</el-descriptions-item>
-        <el-descriptions-item label="知识点">{{
-          currentQuestion.knowledgeTag || '—'
-        }}{{ currentQuestion.knowledgeSubTag ? ' › ' + currentQuestion.knowledgeSubTag : '' }}</el-descriptions-item>
+        <el-descriptions-item label="知识点"
+          >{{ currentQuestion.knowledgeTag || '—'
+          }}{{
+            currentQuestion.knowledgeSubTag ? ' › ' + currentQuestion.knowledgeSubTag : ''
+          }}</el-descriptions-item
+        >
       </el-descriptions>
       <div v-if="currentQuestion.options" class="q-section">
         <div class="q-label">选项</div>
@@ -390,10 +386,18 @@
               <el-radio-button value="2.2">宽松</el-radio-button>
             </el-radio-group>
           </el-form-item>
+          <el-form-item label="每题一页">
+            <el-switch v-model="layout.onePerPage" />
+          </el-form-item>
+          <el-form-item v-if="layout.onePerPage" label=" ">
+            <span class="opt-hint"
+              >每题独占一页，题目下方到页底自动成为空白书写区（适合解答题作业）</span
+            >
+          </el-form-item>
           <el-form-item label="答题留白"
-            ><el-switch v-model="layout.showAnswerArea"
+            ><el-switch v-model="layout.showAnswerArea" :disabled="layout.onePerPage"
           /></el-form-item>
-          <el-form-item v-if="layout.showAnswerArea" label="留白高度">
+          <el-form-item v-if="layout.showAnswerArea && !layout.onePerPage" label="留白高度">
             <el-slider v-model="layout.answerAreaHeight" :min="20" :max="160" :step="10" />
           </el-form-item>
           <el-form-item label="显示分值"><el-switch v-model="layout.showScore" /></el-form-item>
@@ -430,6 +434,15 @@
     </template>
   </el-dialog>
 
+  <!-- 课时总结：复用可复用组件（作业列表与总结列表共用） -->
+  <LessonSummaryDialog
+    v-model="summaryVisible"
+    :homework-id="summaryHomeworkId"
+    :summary-id="summaryEditId"
+    :school-name="layout.schoolName"
+    @saved="load"
+  />
+
   <!-- 录入成绩 -->
   <el-dialog v-model="scoreVisible" title="录入成绩" width="560px">
     <el-table :data="scoreRows" border max-height="480">
@@ -450,7 +463,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { Plus, Edit, EditPen, Download, Delete } from '@element-plus/icons-vue'
+import { Plus, Edit, EditPen, Download, Delete, Notebook } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getHomeworks,
@@ -464,9 +477,10 @@ import {
 import { getQuestions, getQuestionTags, getQuestionSubTags } from '../../api/question'
 import { getStudents } from '../../api/student'
 import RichContent from '../../components/RichContent.vue'
+import LessonSummaryDialog from '../../components/LessonSummaryDialog.vue'
 import { printHtml, PAPER_FONT } from '../../utils/printHtml'
 import { renderMathInHtml } from '../../utils/mathRender'
-import { sanitizeHtml } from '../../utils/sanitizeHtml'
+import { sanitizeHtml, sanitizeRichHtml } from '../../utils/sanitizeHtml'
 import type { Homework, Question } from '../../types'
 
 const list = ref<Homework[]>([])
@@ -840,6 +854,7 @@ const layout = reactive({
   showAnswer: false,
   fontSize: '16', // px
   lineHeight: '1.8',
+  onePerPage: false, // 每题独占一页，余下为空白书写区
   showAnswerArea: true,
   answerAreaHeight: 60, // px
   showScore: true,
@@ -862,6 +877,8 @@ const escapeHtml = (s: any) =>
     }
     return map[c]
   })
+
+const safeQuestionHtml = (html: unknown) => sanitizeRichHtml(String(html ?? ''))
 
 // 生成「姓名/年级/分数」填写框（有值则预填，无值留空方框）
 const fillLine = (val?: string) =>
@@ -911,12 +928,17 @@ const buildHomeworkHtml = () => {
           ${layout.showKnowledge && q.knowledgeTag ? `<span style="color:#999;font-size:${fs - 2}px;margin-left:6px;">${escapeHtml(q.knowledgeTag)}${q.knowledgeSubTag ? ' › ' + escapeHtml(q.knowledgeSubTag) : ''}</span>` : ''}
           ${layout.showScore ? `<span style="float:right;color:#666;">（${layout.scorePerQuestion} 分）</span>` : ''}
         </div>
-        <div>${q.title || ''}</div>
+        <div>${safeQuestionHtml(q.title)}</div>
         ${opts}
-        ${q.body ? `<div style="margin-top:4px;">${q.body}</div>` : ''}
-        ${layout.showAnswerArea ? `<div style="height:${layout.answerAreaHeight}px;"></div>` : ''}
-        ${layout.showAnswer && q.answer ? `<div style="color:#c0392b;margin-top:4px;"><b>【答案与解析】</b>${q.answer}</div>` : ''}
-      </div>`
+        ${q.body ? `<div style="margin-top:4px;">${safeQuestionHtml(q.body)}</div>` : ''}
+        ${layout.showAnswerArea && !layout.onePerPage ? `<div style="height:${layout.answerAreaHeight}px;"></div>` : ''}
+        ${layout.showAnswer && q.answer ? `<div style="color:#c0392b;margin-top:4px;"><b>【答案与解析】</b>${safeQuestionHtml(q.answer)}</div>` : ''}
+      </div>
+      ${
+        layout.onePerPage && i < questions.length - 1
+          ? '<div class="page-break" style="page-break-after:always;"></div>'
+          : ''
+      }`
       })
       .join('')
 
@@ -965,6 +987,18 @@ const doExport = () => {
   if (!okFlag) ElMessage.warning('浏览器拦截了弹出窗口，请允许本站弹窗后再试')
 }
 
+/* ===================== 课时总结 ===================== */
+// 编辑器已抽成 LessonSummaryDialog 组件（作业列表与「课时总结」菜单页共用）
+const summaryVisible = ref(false)
+const summaryHomeworkId = ref<number | null>(null)
+const summaryEditId = ref<number | null>(null)
+
+// 从作业行打开：组件内部自行载入该作业的学生/题目数/历史记录
+const openSummary = (row: any) => {
+  summaryHomeworkId.value = row.id
+  summaryEditId.value = null
+  summaryVisible.value = true
+}
 const save = async () => {
   if (!(form.studentIds || []).length) {
     ElMessage.warning('请先选择学生')
@@ -1210,6 +1244,11 @@ onMounted(load)
   border-right: 1px solid var(--line);
   padding-right: 12px;
 }
+.opt-hint {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
 .export-preview {
   flex: 1;
   overflow: auto;
@@ -1217,11 +1256,28 @@ onMounted(load)
   padding: 12px;
   border-radius: 6px;
 }
+/* 预览中的分页标记：分页符本身无高度，打印窗口也没有这段样式，故只在预览里可见 */
+.export-preview :deep(.page-break) {
+  position: relative;
+  margin: 20px 0;
+  border-top: 1px dashed var(--line-strong);
+}
+.export-preview :deep(.page-break)::after {
+  content: '分页';
+  position: absolute;
+  right: 0;
+  top: -9px;
+  padding: 0 8px;
+  font-size: 11px;
+  color: var(--ink-soft);
+  background: #fff;
+}
 .paper {
   box-shadow: 0 2px 14px rgba(90, 76, 55, 0.16);
   border-radius: 2px;
   min-height: 100%;
 }
+
 .export-footer {
   display: flex;
   align-items: center;

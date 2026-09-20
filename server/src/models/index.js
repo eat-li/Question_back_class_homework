@@ -11,6 +11,7 @@ const Submission = require('./Submission')(sequelize, DataTypes)
 const ExamScore = require('./ExamScore')(sequelize, DataTypes)
 const KnowledgeCategory = require('./KnowledgeCategory')(sequelize, DataTypes)
 const Conclusion = require('./Conclusion')(sequelize, DataTypes)
+const LessonSummary = require('./LessonSummary')(sequelize, DataTypes)
 
 // 学生 1—* 提交
 Student.hasMany(Submission, { foreignKey: 'studentId' })
@@ -46,6 +47,12 @@ ExamScore.belongsTo(Student, { foreignKey: 'studentId' })
 KnowledgeCategory.hasMany(Conclusion, { foreignKey: 'categoryId', as: 'conclusions' })
 Conclusion.belongsTo(KnowledgeCategory, { foreignKey: 'categoryId', as: 'category' })
 
+// 作业 1—* 课时总结；学生 1—* 课时总结
+Homework.hasMany(LessonSummary, { foreignKey: 'homeworkId', as: 'lessonSummaries' })
+LessonSummary.belongsTo(Homework, { foreignKey: 'homeworkId', as: 'homework' })
+Student.hasMany(LessonSummary, { foreignKey: 'studentId', as: 'lessonSummaries' })
+LessonSummary.belongsTo(Student, { foreignKey: 'studentId', as: 'student' })
+
 module.exports = {
   sequelize,
   Student,
@@ -56,5 +63,6 @@ module.exports = {
   Submission,
   ExamScore,
   KnowledgeCategory,
-  Conclusion
+  Conclusion,
+  LessonSummary
 }
