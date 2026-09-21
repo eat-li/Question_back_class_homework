@@ -2,9 +2,29 @@
   <el-card>
     <div class="toolbar">
       <el-button type="primary" :icon="Plus" @click="openCreate">发布作业</el-button>
+      <el-button
+        v-if="selectedIds.length"
+        type="danger"
+        plain
+        :icon="Delete"
+        :loading="bulkDeleting"
+        @click="bulkRemove"
+        >批量删除（{{ selectedIds.length }}）</el-button
+      >
+      <el-button v-if="selectedIds.length" text @click="clearSelection">清空选择</el-button>
+      <span v-if="selectedIds.length" class="picked-count">已选 {{ selectedIds.length }} 个作业</span>
     </div>
 
-    <el-table :data="list" border stripe v-loading="loading">
+    <el-table
+      ref="tableRef"
+      :data="list"
+      border
+      stripe
+      row-key="id"
+      v-loading="loading"
+      @selection-change="onSelectionChange"
+    >
+      <el-table-column type="selection" width="46" reserve-selection />
       <el-table-column prop="title" label="作业标题" />
       <el-table-column label="状态" width="100">
         <template #default="{ row }">
@@ -472,10 +492,12 @@ import {
   createHomework,
   updateHomework,
   deleteHomework,
+  bulkDeleteHomeworks,
   saveHomeworkScores
 } from '../../api/homework'
 import { getQuestions, getQuestionTags, getQuestionSubTags } from '../../api/question'
 import { getStudents } from '../../api/student'
+import { getSummaries } from '../../api/summary'
 import RichContent from '../../components/RichContent.vue'
 import LessonSummaryDialog from '../../components/LessonSummaryDialog.vue'
 import { printHtml, PAPER_FONT } from '../../utils/printHtml'
@@ -1044,10 +1066,87 @@ const saveScores = async () => {
 }
 
 const remove = async (row: any) => {
-  await ElMessageBox.confirm('确定删除该作业？', '提示', { type: 'warning' })
-  await deleteHomework(row.id)
-  ElMessage.success('删除成功')
-  load()
+  // 该作业下的课时总结会一并删除，删除前提示数量，避免误删教学记录
+  let summaryCount = 0
+  try {
+    summaryCount = ((await getSummaries({ homeworkId: row.id })) || []).length
+  } catch {
+    /* 统计失败不阻塞删除 */
+  }
+  try {
+    await ElMessageBox.confirm(
+      `确定删除作业「${row.title}」？将同时删除其题目/学生关联与成绩记录` +
+        (summaryCount ? `，以及 ${summaryCount} 条课时总结` : '') +
+        '。此操作不可恢复。',
+      '删除作业确认',
+      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+  try {
+    await deleteHomework(row.id)
+    ElMessage.success('删除成功')
+    await load()
+  } catch (err) {
+    // 错误提示已由 request.ts 全局弹出
+    console.error('删除作业失败', err)
+  }
+}
+
+/* ===================== 批量删除 ===================== */
+const tableRef = ref<any>()
+const selectedIds = ref<number[]>([])
+const bulkDeleting = ref(false)
+
+const onSelectionChange = (rows: any[]) => {
+  selectedIds.value = rows.map((r) => r.id)
+}
+
+const clearSelection = () => {
+  tableRef.value?.clearSelection()
+  selectedIds.value = []
+}
+
+const bulkRemove = async () => {
+  const ids = [...selectedIds.value]
+  if (!ids.length) return
+
+  let summaryCount = 0
+  try {
+    const all = (await getSummaries({})) || []
+    summaryCount = all.filter((s) => ids.includes(s.homeworkId)).length
+  } catch {
+    /* 统计失败不阻塞删除 */
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确定删除所选 ${ids.length} 个作业？将同时删除其题目/学生关联、成绩记录` +
+        (summaryCount ? `，以及 ${summaryCount} 条课时总结` : '') +
+        '。此操作不可恢复。',
+      '批量删除确认',
+      { type: 'warning', confirmButtonText: `删除 ${ids.length} 个`, cancelButtonText: '取消' }
+    )
+  } catch {
+    return
+  }
+
+  bulkDeleting.value = true
+  try {
+    const res = await bulkDeleteHomeworks(ids)
+    ElMessage.success(
+      `已删除 ${res.deleted} 个作业` + (res.summaries ? `（含 ${res.summaries} 条课时总结）` : '')
+    )
+    clearSelection()
+    // 删除后当前页可能已空，回退页码避免停在空白页
+    if (page.value > 1 && list.value.length <= ids.length) page.value -= 1
+    await load()
+  } catch (err) {
+    console.error('批量删除作业失败', err)
+  } finally {
+    bulkDeleting.value = false
+  }
 }
 
 onMounted(load)

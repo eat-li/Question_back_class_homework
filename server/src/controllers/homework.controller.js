@@ -7,7 +7,8 @@ const {
   HomeworkStudent,
   Submission,
   Student,
-  Question
+  Question,
+  LessonSummary
 } = require('../models')
 const { ok, fail } = require('../utils/response')
 const { cacheDel } = require('../utils/cache')
@@ -251,17 +252,56 @@ exports.update = async (req, res, next) => {
   }
 }
 
+// 删除作业（单条 / 批量共用）：先清理关联数据，再删作业本身
+// 说明：submission 有 ON DELETE CASCADE 会随作业自动删除；
+// lesson_summaries 无外键约束，必须显式删除，否则会留下打不开的孤儿记录。
+async function purgeHomeworks(ids, transaction) {
+  if (!ids.length) return { summaries: 0 }
+  const summaries = await LessonSummary.count({
+    where: { homeworkId: ids },
+    transaction
+  })
+  await HomeworkQuestion.destroy({ where: { homeworkId: ids }, transaction })
+  await HomeworkStudent.destroy({ where: { homeworkId: ids }, transaction })
+  await LessonSummary.destroy({ where: { homeworkId: ids }, transaction })
+  await Homework.destroy({ where: { id: ids }, transaction })
+  return { summaries }
+}
+
 exports.remove = async (req, res, next) => {
   try {
     const homework = await Homework.findByPk(req.params.id)
     if (!homework) return fail(res, 40400, '作业不存在')
-    await sequelize.transaction(async (t) => {
-      await HomeworkQuestion.destroy({ where: { homeworkId: homework.id }, transaction: t })
-      await HomeworkStudent.destroy({ where: { homeworkId: homework.id }, transaction: t })
-      await homework.destroy({ transaction: t })
-    })
+    await sequelize.transaction((t) => purgeHomeworks([homework.id], t))
     cacheDel('stats:overview')
     ok(res, null, '删除成功')
+  } catch (e) {
+    next(e)
+  }
+}
+
+// 批量删除作业：{ ids: [1,2,3] }
+exports.bulkRemove = async (req, res, next) => {
+  try {
+    const raw = Array.isArray(req.body?.ids) ? req.body.ids : []
+    const ids = [...new Set(raw.map((x) => Number(x)).filter((n) => Number.isInteger(n) && n > 0))]
+    if (!ids.length) return fail(res, 40000, '请先选择要删除的作业')
+
+    const found = await Homework.findAll({ where: { id: ids }, attributes: ['id'] })
+    if (!found.length) return fail(res, 40400, '所选作业都不存在（可能已被删除）')
+
+    const existingIds = found.map((h) => h.id)
+    let summaries = 0
+    await sequelize.transaction(async (t) => {
+      const result = await purgeHomeworks(existingIds, t)
+      summaries = result.summaries
+    })
+    cacheDel('stats:overview')
+    ok(
+      res,
+      { deleted: existingIds.length, summaries },
+      `已删除 ${existingIds.length} 个作业` + (summaries ? `（含 ${summaries} 条课时总结）` : '')
+    )
   } catch (e) {
     next(e)
   }

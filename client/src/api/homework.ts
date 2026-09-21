@@ -22,6 +22,11 @@ export const createHomework = (data: Partial<Homework>) => request.post('/homewo
 export const updateHomework = (id: number, data: Partial<Homework>) =>
   request.patch(`/homeworks/${id}`, data)
 export const deleteHomework = (id: number) => request.delete(`/homeworks/${id}`)
+/** 批量删除作业（后端一并清理题目/学生关联与课时总结；成绩随外键级联删除） */
+export const bulkDeleteHomeworks = (
+  ids: number[]
+): Promise<{ deleted: number; summaries: number }> =>
+  request.post('/homeworks/bulk-delete', { ids }, { timeout: 60000 })
 export const saveHomeworkScores = (
   id: number,
   scores: Array<{ studentId: number; score: number }>

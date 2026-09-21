@@ -4,6 +4,7 @@ const c = require('../controllers/homework.controller')
 
 router.get('/', c.list)
 router.post('/', c.create)
+router.post('/bulk-delete', c.bulkRemove) // 批量删除（须在 /:id 之前声明）
 router.get('/:id/questions', c.getQuestions) // 作业题目详情（导出用）
 router.get('/:id', c.get)
 router.patch('/:id', c.update)
