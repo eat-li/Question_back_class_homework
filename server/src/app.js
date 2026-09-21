@@ -15,19 +15,30 @@ const corsOrigins = (process.env.CORS_ORIGINS || defaultCorsOrigins)
 
 const app = express()
 
-// CORS：生产环境默认只允许本机前端，可通过 CORS_ORIGINS 配置多个来源
-app.use(
+// CORS：生产环境默认只允许本机前端，可通过 CORS_ORIGINS 配置多个来源。
+//
+// 关键：必须放行「请求自身的来源」。打包模式（后端托管 client/dist）下浏览器加载
+// <script type="module"> 会带上 Origin 头，属于同源请求却仍走 CORS 校验；
+// 若白名单里只有 5173（开发服务器），后端就会把自己托管的 JS/CSS 全部 403 掉，
+// 表现为页面白屏、控制台一堆 "Failed to load resource: 403"。
+app.use((req, res, next) => {
+  const selfOrigin = `${req.protocol}://${req.get('host')}`
   cors({
     origin(origin, callback) {
-      if (!origin || corsOrigins.includes('*') || corsOrigins.includes(origin)) {
+      if (
+        !origin ||
+        origin === selfOrigin ||
+        corsOrigins.includes('*') ||
+        corsOrigins.includes(origin)
+      ) {
         return callback(null, true)
       }
       const error = new Error('CORS origin not allowed')
       error.status = 403
       return callback(error)
     }
-  })
-)
+  })(req, res, next)
+})
 
 // 基础安全响应头
 app.use((req, res, next) => {
