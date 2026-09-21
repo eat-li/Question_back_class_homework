@@ -1,6 +1,7 @@
 // Express 应用装配
 const express = require('express')
 const cors = require('cors')
+const fs = require('fs')
 const path = require('path')
 const routes = require('./routes')
 const errorHandler = require('./middlewares/errorHandler')
@@ -102,6 +103,21 @@ app.use(
 
 // 业务路由
 app.use('/api', routes)
+
+// —— 打包后的前端托管（生产/日常使用模式）——
+// client/dist 存在时，后端同源托管前端：无需 Vite、无需跨域代理，只跑一个进程。
+// 访问 http://localhost:<PORT>/ 即为完整应用；不存在 dist 时（纯后端开发）自动跳过。
+const clientDist = path.join(__dirname, '../../client/dist')
+if (fs.existsSync(path.join(clientDist, 'index.html'))) {
+  app.use(express.static(clientDist, { index: false, maxAge: '1h' }))
+  // SPA 路由回退：非 /api、/katex-fonts 的 GET 请求统一返回 index.html，
+  // 保证刷新 /homeworks、/summaries 等前端路由不会 404
+  app.get(/^\/(?!api\/|katex-fonts\/).*/, (req, res, next) => {
+    if (req.method !== 'GET') return next()
+    res.sendFile(path.join(clientDist, 'index.html'))
+  })
+  console.log('📦 已托管前端静态文件:', clientDist)
+}
 
 app.use(errorHandler)
 

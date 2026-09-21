@@ -1,10 +1,10 @@
 @echo off
 chcp 65001 >nul
-title 数学老师综合管理后台 - 一键启动
+title 数学老师综合管理后台 - 一键启动（打包版）
 cd /d "%~dp0"
 
 echo ================================================
-echo   数学老师综合管理后台  一键启动
+echo   数学老师综合管理后台  一键启动（生产/日常使用）
 echo ================================================
 echo.
 
@@ -23,19 +23,35 @@ where pnpm >nul 2>nul
 if errorlevel 1 goto no_pnpm
 
 :check_deps
-if exist "node_modules" goto start_dev
+if exist "node_modules" goto check_dist
 echo [信息] 首次运行，正在安装依赖，请稍候...
 echo.
 call pnpm install
 if errorlevel 1 goto install_fail
 
-:start_dev
-echo [信息] 正在启动前后端服务...
-echo    前端: http://localhost:5173
-echo    后端: http://localhost:4300
-echo    关闭本窗口或按 Ctrl+C 可同时停止前后端。
+:check_dist
+rem 前端已打包（client\dist\index.html 存在）时直接使用，避免每次启动都构建
+if exist "client\dist\index.html" goto start_server
+echo [信息] 未检测到前端打包产物，正在构建（首次约需 20 秒）...
 echo.
-call pnpm dev
+call pnpm build
+if errorlevel 1 goto build_fail
+if not exist "client\dist\index.html" goto build_fail
+
+:start_server
+set PORT=4300
+echo [信息] 正在启动服务（后端同时托管前端打包文件）...
+echo.
+echo    访问地址: http://localhost:4300
+echo    说明: 前端已使用打包后的 dist 文件，不需要 Vite 开发服务器。
+echo    如需开发模式（改动即时生效），请运行「启动-开发模式.bat」。
+echo    关闭本窗口或按 Ctrl+C 可停止服务。
+echo.
+
+rem 稍等片刻再打开浏览器，避免页面先于服务就绪
+start "" cmd /c "timeout /t 3 >nul & start http://localhost:4300"
+
+call pnpm --filter "./server" start
 echo.
 echo [信息] 服务已停止。
 pause
@@ -55,6 +71,12 @@ exit /b 1
 
 :install_fail
 echo [错误] 依赖安装失败，请检查网络后重试。
+echo.
+pause
+exit /b 1
+
+:build_fail
+echo [错误] 前端构建失败，请查看上方输出中的具体报错。
 echo.
 pause
 exit /b 1
