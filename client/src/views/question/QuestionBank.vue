@@ -39,6 +39,13 @@
             @click.stop="goSubKnowledge(g.tag, s.name)"
           >
             {{ s.name }} {{ s.total }}
+            <span
+              class="kb-card__sub-edit"
+              title="编辑该二级知识点（重命名 / 合并 / 删除）"
+              @click.stop="openSubEdit(g, s)"
+            >
+              <EditPen />
+            </span>
           </span>
         </div>
       </div>
@@ -47,6 +54,15 @@
   </el-card>
 
   <QuestionFormDialog v-model="dialogVisible" @saved="load" />
+
+  <SubTagEditDialog
+    v-model="subEditVisible"
+    :sub-name="subEditTarget.name"
+    :total="subEditTarget.total"
+    :knowledge-tag="subEditTarget.parent"
+    :siblings="subEditTarget.siblings"
+    @saved="load"
+  />
 </template>
 
 <script setup lang="ts">
@@ -56,6 +72,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getQuestionStats, renameQuestionTag } from '../../api/question'
 import QuestionFormDialog from '../../components/QuestionFormDialog.vue'
+import SubTagEditDialog from '../../components/SubTagEditDialog.vue'
 import type { QuestionStats } from '../../types'
 
 const router = useRouter()
@@ -63,6 +80,25 @@ const loading = ref(false)
 const keyword = ref('')
 const dialogVisible = ref(false)
 const groups = ref<QuestionStats[]>([])
+
+// —— 二级知识点编辑（重命名 / 合并 / 删除 / 换题库）——
+const subEditVisible = ref(false)
+const subEditTarget = ref<{
+  name: string
+  total: number
+  parent: string
+  siblings: { name: string; total: number }[]
+}>({ name: '', total: 0, parent: '', siblings: [] })
+
+const openSubEdit = (g: QuestionStats, s: { name: string; total: number }) => {
+  subEditTarget.value = {
+    name: s.name,
+    total: s.total,
+    parent: g.tag,
+    siblings: (g.subTags || []).filter((x) => x.name !== s.name)
+  }
+  subEditVisible.value = true
+}
 
 // 拉取知识点聚合统计，后端按知识点 GROUP BY，避免全量题目传到前端
 const load = async () => {
@@ -208,5 +244,20 @@ onMounted(load)
   background: var(--moss);
   color: #fffdf9;
   border-color: var(--moss);
+}
+/* 二级知识点编辑入口：平时淡隐，悬停标签时显现 */
+.kb-card__sub-edit {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.kb-card__sub:hover .kb-card__sub-edit {
+  opacity: 0.75;
+}
+.kb-card__sub-edit:hover {
+  opacity: 1;
 }
 </style>

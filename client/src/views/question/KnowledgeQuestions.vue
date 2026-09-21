@@ -63,7 +63,16 @@
         @click="selectSubTag(s.name)"
         @dragover.prevent
         @drop.prevent="onDropTo(s.name)"
-      >{{ s.name }}（{{ s.total }}）</span>
+      >
+        {{ s.name }}（{{ s.total }}）
+        <span
+          class="sub-chip__edit"
+          title="编辑该二级知识点（重命名 / 合并 / 删除）"
+          @click.stop="openSubEdit(s)"
+        >
+          <EditPen />
+        </span>
+      </span>
       <span
         class="sub-chip sub-chip--empty"
         :class="{ active: subTag === '__empty__' }"
@@ -139,6 +148,15 @@
   </el-card>
 
   <QuestionFormDialog v-model="editVisible" :question="editing" @saved="onEditedSaved" />
+
+  <SubTagEditDialog
+    v-model="subEditVisible"
+    :sub-name="subEditTarget.name"
+    :total="subEditTarget.total"
+    :knowledge-tag="tag"
+    :siblings="subTags"
+    @saved="onSubTagSaved"
+  />
 </template>
 
 <script setup lang="ts">
@@ -154,6 +172,7 @@ import {
   renameQuestionTag
 } from '../../api/question'
 import QuestionFormDialog from '../../components/QuestionFormDialog.vue'
+import SubTagEditDialog from '../../components/SubTagEditDialog.vue'
 import RichContent from '../../components/RichContent.vue'
 import type { Question } from '../../types'
 import { printHtml, PAPER_FONT } from '../../utils/printHtml'
@@ -182,6 +201,26 @@ const answerAreaHeight = ref(100)
 // —— 二级知识点筛选 ——
 const subTag = ref('')
 const subTags = ref<{ name: string; total: number }[]>([])
+
+// —— 二级知识点编辑（重命名 / 合并 / 删除 / 换题库）——
+const subEditVisible = ref(false)
+const subEditTarget = ref<{ name: string; total: number }>({ name: '', total: 0 })
+
+const openSubEdit = (s: { name: string; total: number }) => {
+  subEditTarget.value = { name: s.name, total: s.total }
+  subEditVisible.value = true
+}
+
+// 编辑完成后刷新列表与二级候选；若当前正在筛选的二级被改名/删除，跟随切换到新名称
+const onSubTagSaved = async (payload?: { name?: string }) => {
+  const oldName = subEditTarget.value.name
+  await Promise.all([loadSubTags(), load()])
+  if (oldName && subTag.value === oldName) {
+    const next = payload?.name
+    subTag.value = next && subTags.value.some((s) => s.name === next) ? next : ''
+    await load()
+  }
+}
 
 // 加载当前一级知识点下的二级知识点（带题量）
 const loadSubTags = async () => {
@@ -496,6 +535,22 @@ watch(
   border-color: var(--moss);
   color: #fffdf9;
   font-weight: 600;
+}
+/* 二级知识点编辑入口：平时淡隐，鼠标悬停到芯片上才显现，避免干扰筛选点击 */
+.sub-chip__edit {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  opacity: 0;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: opacity 0.15s ease;
+}
+.sub-chip:hover .sub-chip__edit {
+  opacity: 0.7;
+}
+.sub-chip__edit:hover {
+  opacity: 1;
 }
 .sub-chip--empty {
   border-style: dashed;

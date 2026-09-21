@@ -289,3 +289,78 @@ exports.renameTag = async (req, res, next) => {
     next(e)
   }
 }
+
+// 编辑二级知识点：重命名 / 合并到已有二级知识点 / 移回未分类（删除），
+// 并可选择同时更换它所属的一级知识点（即整组题目换题库）。
+//
+// 二级知识点是以题目上的字符串 knowledgeSubTag 聚合出来的，没有独立表，
+// 因此「编辑二级知识点」= 批量更新其下所有题目的 knowledgeSubTag。
+//
+// 参数：
+//   from           原二级知识点名称（必填）
+//   to             新名称；不传 = 不改名称；传空串 / null = 移回未分类（等效删除该二级知识点）
+//   knowledgeTag   限定作用的一级知识点；'__empty__' 表示未分类题库；不传 = 全部题库
+//   toKnowledgeTag 同时更换所属一级知识点；传 null/'' 表示改为未分类；不传 = 不更换
+exports.updateSubTag = async (req, res, next) => {
+  try {
+    const { from, to, knowledgeTag, toKnowledgeTag } = req.body || {}
+
+    const fromName = from == null ? '' : String(from).trim()
+    if (!fromName) return fail(res, 40000, '原二级知识点名称不能为空')
+
+    // 改名与换归属各自独立：只有显式传了该字段才动它，
+    // 否则「只想换题库」的调用会把二级知识点顺手清空。
+    const renameSub = to !== undefined
+    const toName = to == null ? '' : String(to).trim()
+    if (toName.length > 100) return fail(res, 40000, '二级知识点名称不能超过 100 字')
+
+    const moveParent = toKnowledgeTag !== undefined
+    const parentName = toKnowledgeTag == null ? '' : String(toKnowledgeTag).trim()
+    if (parentName.length > 100) return fail(res, 40000, '一级知识点名称不能超过 100 字')
+
+    if (!renameSub && !moveParent) {
+      return ok(res, { updated: 0, cleared: false }, '没有需要修改的内容')
+    }
+    if (renameSub && toName === fromName && !moveParent) {
+      return ok(res, { updated: 0, cleared: false }, '名称未变化')
+    }
+
+    const where = { knowledgeSubTag: fromName }
+    if (knowledgeTag === '__empty__') {
+      where.knowledgeTag = { [Op.or]: [null, ''] }
+    } else if (knowledgeTag != null && String(knowledgeTag) !== '') {
+      where.knowledgeTag = String(knowledgeTag)
+    }
+
+    // 先统计匹配题量：MySQL 的 UPDATE 只返回「实际发生变化」的行数，
+    // 若新值与旧值相同行数会是 0，直接用它报数会误报成「未找到」。
+    const matched = await Question.count({ where })
+    if (!matched) {
+      return ok(res, { updated: 0, cleared: false }, `未找到二级知识点「${fromName}」`)
+    }
+
+    const payload = {}
+    if (renameSub) payload.knowledgeSubTag = toName || null
+    if (moveParent) payload.knowledgeTag = parentName || null
+
+    await Question.update(payload, { where })
+    cacheDel('questions:tags')
+    cacheDel('stats:overview')
+
+    const target = moveParent ? `题库「${parentName || '未分类'}」` : ''
+    let message
+    if (renameSub && !toName) {
+      message = `已删除二级知识点「${fromName}」，${matched} 道题移回未分类`
+    } else if (renameSub && moveParent) {
+      message = `已将「${fromName}」更新为「${toName}」并移入${target}，共 ${matched} 道题`
+    } else if (renameSub) {
+      message = `已将「${fromName}」更新为「${toName}」，共 ${matched} 道题`
+    } else {
+      message = `已将二级知识点「${fromName}」移入${target}，共 ${matched} 道题`
+    }
+
+    ok(res, { updated: matched, cleared: renameSub && !toName }, message)
+  } catch (e) {
+    next(e)
+  }
+}
