@@ -118,7 +118,7 @@
   </el-dialog>
 
   <!-- 抽题框 -->
-  <el-drawer v-model="drawerVisible" title="抽题" size="72%">
+  <el-drawer v-model="drawerVisible" title="抽题" size="84%">
     <div class="picker-toolbar">
       <el-input
         v-model="qKeyword"
@@ -160,7 +160,10 @@
         <el-option v-for="t in qSubKnowledgeOptions" :key="t" :label="t" :value="t" />
       </el-select>
       <el-button type="primary" @click="qSearch">查询</el-button>
-      <span class="picker-hint">点击整行即可选中 / 取消</span>
+      <el-checkbox v-model="pickerFull">完整题目</el-checkbox>
+      <span class="picker-hint"
+        >点击整行即可选中 / 取消；题干过长时可关闭「完整题目」，图片可点击放大</span
+      >
       <span class="picked-count">已选 {{ pickedIds.length }} 题</span>
       <el-button v-if="pickedIds.length" size="small" @click="clearPicked">清空已选</el-button>
     </div>
@@ -192,9 +195,19 @@
           />
         </template>
       </el-table-column>
-      <el-table-column label="题干" min-width="220">
+      <el-table-column label="题目" min-width="360">
         <template #default="{ row }">
-          <RichContent class="q-cell-preview" :html="row.title || ''" />
+          <div class="q-cell" :class="{ 'is-compact': !pickerFull }" @click="onQuestionCellClick">
+            <RichContent class="q-cell-preview" :html="row.title || ''" />
+            <template v-if="pickerFull">
+              <div v-if="optionTexts(row).length" class="q-cell-options">
+                <div v-for="(opt, oi) in optionTexts(row)" :key="oi" class="q-cell-option">
+                  {{ String.fromCharCode(65 + oi) }}. {{ opt }}
+                </div>
+              </div>
+              <RichContent v-if="row.body" class="q-cell-body" :html="row.body" />
+            </template>
+          </div>
         </template>
       </el-table-column>
       <el-table-column label="题型" width="90">
@@ -242,7 +255,8 @@
   >
     <div class="sel-hint">
       <template v-if="swapIndex === null">
-        点击任意一题选中，再点另一题即可<b>互换位置</b>；也可拖动左侧 ⠿ 或用「上移/下移」微调。
+        点击任意一题选中，再点另一题即可<b>互换位置</b>；也可拖动左侧 ⠿
+        或用「上移/下移」微调，点「查看整题」可展开完整题目。
       </template>
       <template v-else>
         已选中第 <b>{{ swapIndex + 1 }}</b> 题 —— 再点另一题交换位置，点自己或点「取消选中」放弃。
@@ -273,8 +287,20 @@
           @dragend="onSelDragEnd"
           >⠿</span
         >
-        <div class="sel-main">
-          <RichContent class="sel-title" :html="q.title || ''" />
+        <div class="sel-main" @click="onQuestionCellClick">
+          <RichContent
+            class="sel-title"
+            :class="{ 'is-full': isSelectedFull(q.id) }"
+            :html="q.title || ''"
+          />
+          <template v-if="isSelectedFull(q.id)">
+            <div v-if="optionTexts(q).length" class="q-cell-options">
+              <div v-for="(opt, oi) in optionTexts(q)" :key="oi" class="q-cell-option">
+                {{ String.fromCharCode(65 + oi) }}. {{ opt }}
+              </div>
+            </div>
+            <RichContent v-if="q.body" class="q-cell-body" :html="q.body" />
+          </template>
           <div class="sel-tags">
             <el-tag size="small" type="info">{{ typeLabel(q.type) }}</el-tag>
             <el-tag size="small" type="warning">{{ '★'.repeat(q.difficulty || 0) || '—' }}</el-tag>
@@ -284,6 +310,9 @@
           </div>
         </div>
         <div class="sel-actions">
+          <el-button size="small" text @click.stop="toggleSelectedFull(q.id)">
+            {{ isSelectedFull(q.id) ? '收起' : '查看整题' }}
+          </el-button>
           <el-button size="small" text :disabled="i === 0" @click.stop="moveSelected(i, -1)"
             >上移</el-button
           >
@@ -384,6 +413,13 @@
     <template #footer>
       <el-button type="primary" @click="qDetailVisible = false">关闭</el-button>
     </template>
+  </el-dialog>
+
+  <!-- 题目图片放大预览（抽题列表/已选列表） -->
+  <el-dialog v-model="imgPreviewVisible" title="查看原图" width="70%" top="6vh">
+    <div class="img-preview">
+      <img :src="imgPreviewUrl" alt="题目图片" />
+    </div>
   </el-dialog>
 
   <!-- 导出作业 PDF -->
@@ -536,6 +572,9 @@ const qLoading = ref(false)
 const qPage = ref(1)
 const qPageSize = 10
 const qTotal = ref(0)
+const pickerFull = ref(true) // 抽题列表默认完整显示题目；题库题量大时可关掉只看摘要
+const imgPreviewVisible = ref(false)
+const imgPreviewUrl = ref('')
 
 // —— 选择学生状态 ——
 const studentDrawerVisible = ref(false)
@@ -550,6 +589,12 @@ const typeMap: Record<string, string> = {
   solve: '解答题'
 }
 const typeLabel = (t: string) => typeMap[t] || t
+
+// 选项数组统一转成可展示文本（兼容对象选项）
+const optionTexts = (q: any): string[] => {
+  if (!Array.isArray(q?.options)) return []
+  return q.options.map((opt: any) => (typeof opt === 'string' ? opt : JSON.stringify(opt)))
+}
 
 // —— 状态与截止时间的展示辅助 ——
 const statusMap: Record<
@@ -711,6 +756,17 @@ const onRowClick = (row: any) => {
   else togglePick(row.id, !isPicked(row.id))
 }
 
+// 点击题干中的图片：放大预览，并阻止触发行选中/切换
+const onQuestionCellClick = (e: MouseEvent) => {
+  const target = e.target as HTMLElement
+  if (target?.tagName !== 'IMG') return
+  const src = target.getAttribute('src')
+  if (!src) return
+  e.stopPropagation()
+  imgPreviewUrl.value = src
+  imgPreviewVisible.value = true
+}
+
 // 已选行高亮
 const rowClassName = ({ row }: { row: any }) => (isPicked(row.id) ? 'row-picked' : '')
 
@@ -735,12 +791,14 @@ const selectedLoading = ref(false)
 const selectedList = ref<any[]>([])
 const dragIndex = ref<number | null>(null)
 const swapIndex = ref<number | null>(null) // 点选互换：已选中待交换的题序号
+const selectedFullIds = ref<number[]>([]) // 已展开查看完整题目的题目 id
 
 // 打开「已选题目」：按当前顺序取回题目详情（顺序 = 打印/导出顺序）
 const openSelected = async () => {
   const ids: number[] = form.questionIds || []
   if (!ids.length) return
   swapIndex.value = null
+  selectedFullIds.value = []
   selectedVisible.value = true
   selectedLoading.value = true
   try {
@@ -792,9 +850,20 @@ const removeSelected = (index: number) => {
   else if (swapIndex.value > index) swapIndex.value -= 1
 }
 
+// 「查看整题」：在排序列表中就地展开 / 收起完整题目
+const isSelectedFull = (id: number) => selectedFullIds.value.includes(id)
+const toggleSelectedFull = (id: number) => {
+  if (isSelectedFull(id)) {
+    selectedFullIds.value = selectedFullIds.value.filter((x) => x !== id)
+  } else {
+    selectedFullIds.value = [...selectedFullIds.value, id]
+  }
+}
+
 const clearSelected = () => {
   selectedList.value = []
   swapIndex.value = null
+  selectedFullIds.value = []
 }
 
 // 拖拽排序：拖过某一行即把该行插到目标位置（实时预览）
@@ -1167,18 +1236,40 @@ onMounted(load)
   color: var(--ink-soft);
   font-size: 13px;
 }
-/* 抽题列表题干预览：渲染富文本与 LaTeX 公式，最多两行，超出隐藏（完整内容见详情弹窗） */
+/* 抽题列表题目预览：默认完整展示题干 + 选项 + 补充说明；关闭「完整题目」后只保留两行摘要 */
 .q-cell-preview {
   font-size: 13px;
   line-height: 1.6;
+}
+.q-cell.is-compact .q-cell-preview {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.q-cell-preview :deep(.katex-display) {
+.q-cell-preview :deep(img),
+.q-cell-body :deep(img),
+.sel-title :deep(img) {
+  max-width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+  cursor: zoom-in;
+}
+.q-cell-preview :deep(.katex-display),
+.q-cell-body :deep(.katex-display) {
   overflow-x: auto;
   overflow-y: hidden;
+}
+.q-cell-options {
+  margin: 6px 0 0 4px;
+}
+.q-cell-option {
+  line-height: 1.7;
+  color: var(--ink);
+}
+.q-cell-body {
+  margin-top: 6px;
+  font-size: 13px;
 }
 .picker-toolbar {
   display: flex;
@@ -1226,9 +1317,9 @@ onMounted(load)
   gap: 14px;
   padding: 14px 18px;
   margin-bottom: 10px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: #fffdf9;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.55);
   cursor: pointer;
   transition:
     border-color 0.15s ease,
@@ -1236,14 +1327,14 @@ onMounted(load)
     background-color 0.15s ease;
 }
 .sel-row:hover {
-  border-color: var(--moss);
-  box-shadow: 0 2px 8px rgba(107, 143, 113, 0.12);
+  border-color: rgba(150, 104, 26, 0.5);
+  box-shadow: 0 2px 8px rgba(24, 30, 36, 0.08);
 }
 /* 点选待交换 */
 .sel-row.is-picked {
   border-color: var(--moss);
   background: var(--moss-soft);
-  box-shadow: 0 0 0 2px rgba(107, 143, 113, 0.25);
+  box-shadow: 0 0 0 2px rgba(150, 104, 26, 0.28);
 }
 .sel-row.is-dragging {
   opacity: 0.55;
@@ -1264,7 +1355,7 @@ onMounted(load)
 }
 .sel-no.is-picked {
   background: var(--moss);
-  color: #fffdf9;
+  color: var(--on-accent);
 }
 .sel-handle {
   flex-shrink: 0;
@@ -1288,6 +1379,10 @@ onMounted(load)
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+.sel-title.is-full {
+  display: block;
+  overflow: visible;
 }
 .sel-title :deep(.katex-display) {
   overflow-x: auto;
@@ -1331,6 +1426,18 @@ onMounted(load)
   line-height: 1.8;
   color: var(--ink);
 }
+.img-preview {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  max-height: 72vh;
+  overflow: auto;
+}
+.img-preview img {
+  max-width: 100%;
+  max-height: 72vh;
+  object-fit: contain;
+}
 .export-layout {
   display: flex;
   gap: 16px;
@@ -1372,7 +1479,7 @@ onMounted(load)
   background: #fff;
 }
 .paper {
-  box-shadow: 0 2px 14px rgba(90, 76, 55, 0.16);
+  box-shadow: 0 2px 14px rgba(24, 30, 36, 0.14);
   border-radius: 2px;
   min-height: 100%;
 }
@@ -1393,7 +1500,7 @@ onMounted(load)
   flex-shrink: 0;
 }
 .end-at--expired {
-  color: #f56c6c;
+  color: var(--el-color-danger);
   font-weight: 600;
 }
 .pager {
