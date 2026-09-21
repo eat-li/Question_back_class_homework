@@ -169,8 +169,8 @@ const reset = () => {
 }
 .allow-list code {
   padding: 1px 5px;
-  border-radius: 3px;
-  background: rgba(0, 0, 0, 0.06);
+  border-radius: 6px;
+  background: rgba(26, 32, 38, 0.07);
   font-size: 12px;
 }
 </style>

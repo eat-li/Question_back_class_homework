@@ -144,7 +144,7 @@ onMounted(load)
   font-size: 13px;
 }
 .end-at--expired {
-  color: #f56c6c;
+  color: var(--el-color-danger);
   font-weight: 600;
 }
 
@@ -154,7 +154,7 @@ onMounted(load)
 }
 .hw-error__text {
   margin: 0 0 12px;
-  color: #9ca3af;
+  color: var(--ink-soft);
   font-size: 14px;
 }
 
@@ -194,10 +194,10 @@ onMounted(load)
 }
 .hw-q__opt {
   margin: 2px 0;
-  color: #555;
+  color: var(--ink-regular);
 }
 .hw-q__body {
   margin-top: 8px;
-  color: #555;
+  color: var(--ink-regular);
 }
 </style>

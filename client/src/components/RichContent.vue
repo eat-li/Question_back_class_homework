@@ -36,13 +36,13 @@ const safeHtml = computed(() => renderMathInHtml(sanitizeRichHtml(props.html || 
 }
 .rich-content :deep(th),
 .rich-content :deep(td) {
-  border: 1px solid #d8d2c4;
+  border: 1px solid var(--line);
   padding: 6px 10px;
   vertical-align: top;
   text-align: left;
 }
 .rich-content :deep(th) {
-  background: #f3eddf;
+  background: rgba(255, 255, 255, 0.55);
   font-weight: 600;
 }
 </style>

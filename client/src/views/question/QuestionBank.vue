@@ -163,16 +163,20 @@ onMounted(load)
   gap: 16px;
 }
 .kb-card {
-  border: 1px solid var(--line);
-  border-radius: 12px;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
   padding: 18px;
   cursor: pointer;
-  background: #fffdf9;
+  background-color: transparent;
+  background-image: linear-gradient(180deg, var(--glass-bg-strong), var(--glass-bg));
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow-soft);
   transition: all 0.2s ease;
 }
 .kb-card:hover {
-  border-color: var(--moss);
-  box-shadow: 0 6px 16px rgba(107, 143, 113, 0.18);
+  border-color: rgba(150, 104, 26, 0.5);
+  box-shadow: var(--shadow-hover);
   transform: translateY(-2px);
 }
 .kb-card__head {
@@ -242,7 +246,7 @@ onMounted(load)
 }
 .kb-card__sub:hover {
   background: var(--moss);
-  color: #fffdf9;
+  color: var(--on-accent);
   border-color: var(--moss);
 }
 /* 二级知识点编辑入口：平时淡隐，悬停标签时显现 */

@@ -1,66 +1,172 @@
+/* ============================================================================
+   主题令牌 · 玻璃液态（Glass / Liquid Metal）
+   ----------------------------------------------------------------------------
+   换肤约定：整体替换本文件即可切换主题，因此这里【不新增语义、只改取值】，
+   所有既有变量名（--moss / --paper / --side …）全部保留，页面样式无需改动。
+
+   设计基线：
+   · 底色用冷灰白，玻璃层用暖白 —— 底冷玻璃暖，靠材质温差分层级，而不是靠加色。
+   · 全站只有一个强调色：琥珀金。它专属于「主操作 / 进行中 / 需处理」。
+     成功=低饱和橄榄、危险=低饱和砖红、信息=石墨灰，都压到最低饱和度，
+     避免出现第二个抢眼的色相。
+   · 光源统一在左上方：高光边在左上，投影落右下。
+   · 刻意避开「奶油白 + 高对比衬线 + 陶土色」那套通用 AI 配色。
+   ============================================================================ */
 :root {
-  /* 教师工作台：粉笔纸、黑板绿与少量朱砂色 */
-  --paper: #f3f5f1;
-  --paper-deep: #e8ece6;
-  --surface: #fcfdfb;
-  --surface-muted: #f6f8f4;
-  --side: #18362f;
-  --ink: #202824;
-  --ink-regular: #46514c;
-  --ink-soft: #75807a;
-  --line: #dce2dc;
-  --line-strong: #cbd4cc;
-  --moss: #2f6658;
-  --moss-deep: #24483f;
-  --moss-soft: #e1ebe5;
-  --accent: #b24c3d;
-  --accent-soft: #f5e5e1;
-  --ochre: #a47732;
-  --radius-sm: 4px;
-  --radius: 6px;
-  --radius-lg: 8px;
-  --shadow-soft: 0 1px 2px rgba(32, 40, 36, 0.04), 0 8px 24px rgba(32, 40, 36, 0.05);
-  --shadow-hover: 0 3px 8px rgba(32, 40, 36, 0.06), 0 14px 32px rgba(32, 40, 36, 0.08);
-  --font-display: 'STKaiti', 'KaiTi', 'Songti SC', 'STSong', serif;
+  /* —— 底色与玻璃 —— */
+  --paper: #edeff1; /* 冷灰白页底，避免纯白死白 */
+  --paper-deep: #e4e7ea;
+  --surface: #fcfcfb; /* 不透明暖白：给弹层/下拉等需要实底的地方 */
+  --surface-muted: #f5f6f5;
+  --side: transparent; /* 侧栏改为玻璃，由布局自绘 */
+
+  --glass-bg: rgba(253, 253, 252, 0.62);
+  --glass-bg-strong: rgba(253, 253, 252, 0.84);
+  --glass-bg-thin: rgba(253, 253, 252, 0.4);
+  --glass-blur: blur(24px) saturate(1.3);
+  --glass-blur-sm: blur(14px) saturate(1.2);
+
+  /* —— 玻璃厚度与光影 —— */
+  --edge: rgba(255, 255, 255, 0.72); /* 玻璃 1px 高光边 */
+  --edge-soft: rgba(255, 255, 255, 0.36);
+  --hair: rgba(26, 32, 38, 0.09); /* 细分割线 */
+  --lit-top: inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  --lit-bottom: inset 0 -1px 0 rgba(255, 255, 255, 0.3);
+  --lit-deep: inset -1px -1px 0 rgba(126, 138, 148, 0.13);
+  --press: inset 0 2px 6px rgba(24, 30, 36, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+
+  /* —— 文字 —— */
+  --ink: #1a1d1f; /* 石墨黑 */
+  --ink-regular: #4a5259;
+  --ink-soft: #7c858d;
+  --line: rgba(26, 32, 38, 0.1);
+  --line-strong: rgba(26, 32, 38, 0.16);
+
+  /* —— 唯一强调色：琥珀金 ——
+     取值同时满足「白字填充」≥4.8:1 与「浅底文字」≥5:1，两种用法都过 AA。 */
+  --moss: #96681a;
+  --moss-deep: #7d5511;
+  --moss-soft: rgba(150, 104, 26, 0.11);
+  --on-accent: #fffdf7; /* 强调色之上的文字 */
+
+  /* —— 语义色（压到最低饱和度，不与强调色争抢）—— */
+  --accent: #9d4034; /* 危险 / 删除 */
+  --accent-soft: rgba(157, 64, 52, 0.1);
+  --ochre: #7d7566; /* 中性次要 */
+  --olive: #5f6f4c; /* 成功 */
+
+  /* —— 圆角：玻璃需要更圆润的转角 —— */
+  --radius-sm: 12px; /* 控件 */
+  --radius: 16px; /* 卡片 */
+  --radius-lg: 20px; /* 弹层 */
+  --radius-pill: 999px;
+
+  /* —— 阴影：始终带上玻璃的高光边，卡片自然成玻璃 —— */
+  --shadow-soft: var(--lit-top), var(--lit-bottom), var(--lit-deep),
+    0 1px 2px rgba(24, 30, 36, 0.05), 0 12px 28px -16px rgba(24, 30, 36, 0.3);
+  --shadow-hover: var(--lit-top), var(--lit-bottom), var(--lit-deep),
+    0 2px 6px rgba(24, 30, 36, 0.06), 0 24px 48px -22px rgba(24, 30, 36, 0.36);
+  --shadow-pop: var(--lit-top), var(--lit-deep), 0 4px 12px rgba(24, 30, 36, 0.08),
+    0 28px 60px -24px rgba(24, 30, 36, 0.4);
+
+  --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --dur: 0.26s;
+
+  /* —— 字体 ——
+     显示体＝试卷体（宋体 / Times），与后端 PDF 导出的 PAPER_FONT 同源，
+     让界面和它产出的试卷是同一种字。 */
+  --font-display: 'Songti SC', 'STSong', 'SimSun', 'Times New Roman', Georgia, serif;
   --font-body:
-    'MiSans', 'HarmonyOS Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
-  --font-data: 'DIN Alternate', 'Roboto Mono', 'SFMono-Regular', Consolas, monospace;
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'MiSans', 'HarmonyOS Sans SC', 'PingFang SC',
+    'Microsoft YaHei', system-ui, sans-serif;
+  --font-data: 'SF Mono', ui-monospace, 'DIN Alternate', 'Roboto Mono', Consolas, monospace;
+
+  /* ==========================================================================
+     Element Plus 变量映射
+     ========================================================================== */
   --el-color-primary: var(--moss);
-  --el-color-primary-light-3: #668b81;
-  --el-color-primary-light-5: #93ada5;
-  --el-color-primary-light-7: #becfc9;
-  --el-color-primary-light-8: #d3dfda;
-  --el-color-primary-light-9: #eaf0ed;
+  --el-color-primary-light-3: #b6955f;
+  --el-color-primary-light-5: #cbb48d;
+  --el-color-primary-light-7: #dfd2ba;
+  --el-color-primary-light-8: #eae1d1;
+  --el-color-primary-light-9: #f5f0e8;
   --el-color-primary-dark-2: var(--moss-deep);
-  --el-color-primary-rgb: 47, 102, 88;
+  --el-color-primary-rgb: 150, 104, 26;
+
   --el-color-danger: var(--accent);
+  --el-color-danger-light-3: #b6665c;
+  --el-color-danger-light-5: #ce938c;
+  --el-color-danger-light-7: #e6c0bb;
+  --el-color-danger-light-8: #efd4d1;
+  --el-color-danger-light-9: #f7e9e7;
+  --el-color-danger-dark-2: #7e332a;
+
+  --el-color-success: var(--olive);
+  --el-color-success-light-3: #8f9c80;
+  --el-color-success-light-5: #afb8a5;
+  --el-color-success-light-7: #cfd5c9;
+  --el-color-success-light-8: #dfe3db;
+  --el-color-success-light-9: #eff1ec;
+  --el-color-success-dark-2: #4c593d;
+
+  --el-color-warning: var(--moss);
+  --el-color-warning-light-3: #b6955f;
+  --el-color-warning-light-5: #cbb48d;
+  --el-color-warning-light-7: #dfd2ba;
+  --el-color-warning-light-8: #eae1d1;
+  --el-color-warning-light-9: #f5f0e8;
+  --el-color-warning-dark-2: var(--moss-deep);
+
+  --el-color-info: var(--ink-soft);
+  --el-color-info-light-3: #a3aab0;
+  --el-color-info-light-5: #bec3c7;
+  --el-color-info-light-7: #d8dcde;
+  --el-color-info-light-8: #e5e8ea;
+  --el-color-info-light-9: #f2f3f4;
+  --el-color-info-dark-2: #636b72;
+
   --el-font-family: var(--font-body);
   --el-border-radius-base: var(--radius-sm);
-  --el-border-radius-small: 3px;
-  --el-border-radius-round: 999px;
+  --el-border-radius-small: 8px;
+  --el-border-radius-round: var(--radius-pill);
+
   --el-bg-color: var(--surface);
   --el-bg-color-page: var(--paper);
   --el-bg-color-overlay: var(--surface);
+
   --el-text-color-primary: var(--ink);
   --el-text-color-regular: var(--ink-regular);
   --el-text-color-secondary: var(--ink-soft);
-  --el-text-color-placeholder: #9ba49f;
+  --el-text-color-placeholder: #9ba3aa;
+  --el-text-color-disabled: #b3babf;
+
   --el-border-color: var(--line-strong);
   --el-border-color-light: var(--line);
-  --el-border-color-lighter: #e8ece8;
-  --el-border-color-extra-light: #f0f2ef;
-  --el-fill-color: #e8ede9;
-  --el-fill-color-light: #f0f3ef;
-  --el-fill-color-lighter: #f6f8f5;
-  --el-fill-color-extra-light: #fafbf9;
+  --el-border-color-lighter: rgba(26, 32, 38, 0.07);
+  --el-border-color-extra-light: rgba(26, 32, 38, 0.05);
+
+  --el-fill-color: #e7eaec;
+  --el-fill-color-light: #eef0f1;
+  --el-fill-color-lighter: #f4f5f6;
+  --el-fill-color-extra-light: #f9faf9;
   --el-fill-color-blank: var(--surface);
+
+  /* 侧栏改为玻璃后，菜单配色从「深底浅字」翻转为「浅底深字」 */
   --el-menu-bg-color: transparent;
-  --el-menu-text-color: rgba(242, 247, 244, 0.72);
-  --el-menu-active-color: #ffffff;
-  --el-menu-hover-bg-color: rgba(255, 255, 255, 0.07);
+  --el-menu-text-color: var(--ink-regular);
+  --el-menu-active-color: var(--ink);
+  --el-menu-hover-bg-color: rgba(255, 255, 255, 0.62);
   --el-menu-item-height: 44px;
-  --el-table-header-bg-color: #edf1ed;
+
+  --el-table-header-bg-color: rgba(255, 255, 255, 0.5);
   --el-table-header-text-color: var(--ink-regular);
-  --el-table-border-color: var(--line);
-  --el-table-row-hover-bg-color: #f1f5f1;
+  --el-table-border-color: var(--hair);
+  --el-table-row-hover-bg-color: rgba(255, 255, 255, 0.68);
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-text-color: var(--ink-regular);
+
+  --el-mask-color: rgba(237, 239, 241, 0.5);
+  --el-box-shadow-light: var(--shadow-soft);
+  --el-box-shadow: var(--shadow-pop);
 }

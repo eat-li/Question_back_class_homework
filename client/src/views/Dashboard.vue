@@ -79,23 +79,29 @@ const statCards = computed(() => {
       label: '题目总数',
       value: v(c.questionCount),
       icon: Document,
-      bg: '#e1ebe5',
-      color: '#24483f'
+      bg: 'rgba(150, 104, 26, 0.11)',
+      color: '#7d5511'
     },
-    { label: '学生人数', value: v(c.studentCount), icon: User, bg: '#eee8dc', color: '#7f5e28' },
+    {
+      label: '学生人数',
+      value: v(c.studentCount),
+      icon: User,
+      bg: 'rgba(125, 117, 102, 0.13)',
+      color: '#5c5648'
+    },
     {
       label: '作业总数',
       value: v(c.homeworkCount),
       icon: Notebook,
-      bg: '#e7ebe3',
-      color: '#56634d'
+      bg: 'rgba(95, 111, 76, 0.13)',
+      color: '#4c593d'
     },
     {
       label: '成绩记录',
       value: v(c.submissionCount),
       icon: Trophy,
-      bg: '#f5e5e1',
-      color: '#934236'
+      bg: 'rgba(157, 64, 52, 0.11)',
+      color: '#9d4034'
     }
   ]
 })
@@ -116,15 +122,15 @@ const renderCharts = () => {
   renderOne(typeRef.value!, {
     tooltip: { trigger: 'item', formatter: '{b}: {c} 题 ({d}%)' },
     legend: { bottom: 0, icon: 'circle' },
-    color: ['#2f6658', '#a47732', '#b24c3d'],
+    color: ['#96681a', '#7d7566', '#9d4034'],
     series: [
       {
         type: 'pie',
         radius: ['42%', '66%'],
         center: ['50%', '44%'],
         avoidLabelOverlap: true,
-        itemStyle: { borderRadius: 6, borderColor: '#fbfdfc', borderWidth: 2 },
-        label: { formatter: '{b}\n{c} 题', fontSize: 12, color: '#3a403d' },
+        itemStyle: { borderRadius: 6, borderColor: '#fcfcfb', borderWidth: 2 },
+        label: { formatter: '{b}\n{c} 题', fontSize: 12, color: '#4a5259' },
         data: typeData
       }
     ]
@@ -141,22 +147,22 @@ const renderCharts = () => {
     xAxis: {
       type: 'category',
       data: ['★1', '★2', '★3', '★4', '★5'],
-      axisLine: { lineStyle: { color: '#dde5e1' } },
+      axisLine: { lineStyle: { color: 'rgba(26, 32, 38, 0.16)' } },
       axisTick: { show: false },
-      axisLabel: { color: '#7d8681' }
+      axisLabel: { color: '#7c858d' }
     },
     yAxis: {
       type: 'value',
       minInterval: 1,
-      splitLine: { lineStyle: { color: '#eaf0ed' } },
-      axisLabel: { color: '#7d8681' }
+      splitLine: { lineStyle: { color: 'rgba(26, 32, 38, 0.07)' } },
+      axisLabel: { color: '#7c858d' }
     },
     series: [
       {
         type: 'bar',
         data: diffData,
         barWidth: '46%',
-        itemStyle: { color: '#5b7d74', borderRadius: [6, 6, 0, 0] }
+        itemStyle: { color: '#96681a', borderRadius: [6, 6, 0, 0] }
       }
     ]
   })
@@ -172,23 +178,23 @@ const renderCharts = () => {
     xAxis: {
       type: 'value',
       minInterval: 1,
-      splitLine: { lineStyle: { color: '#eaf0ed' } },
-      axisLabel: { color: '#7d8681' }
+      splitLine: { lineStyle: { color: 'rgba(26, 32, 38, 0.07)' } },
+      axisLabel: { color: '#7c858d' }
     },
     yAxis: {
       type: 'category',
       inverse: true,
       data: know.map((k: any) => k.name),
-      axisLine: { lineStyle: { color: '#dde5e1' } },
+      axisLine: { lineStyle: { color: 'rgba(26, 32, 38, 0.16)' } },
       axisTick: { show: false },
-      axisLabel: { color: '#4a514d' }
+      axisLabel: { color: '#4a5259' }
     },
     series: [
       {
         type: 'bar',
         data: know.map((k: any) => k.value),
         barWidth: '52%',
-        itemStyle: { color: '#c2a878', borderRadius: [0, 6, 6, 0] }
+        itemStyle: { color: '#7d7566', borderRadius: [0, 6, 6, 0] }
       }
     ]
   })
@@ -273,8 +279,11 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 14px;
   min-height: 112px;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background-color: transparent;
+  background-image: linear-gradient(180deg, var(--glass-bg-strong), var(--glass-bg));
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--edge);
   border-radius: var(--radius);
   padding: 22px 20px;
   box-shadow: var(--shadow-soft);
@@ -300,7 +309,7 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 12px;
   right: 14px;
-  color: #aab2ad;
+  color: var(--ink-soft);
   font-family: var(--font-data);
   font-size: 10px;
 }

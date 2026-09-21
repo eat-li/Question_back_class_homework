@@ -90,7 +90,7 @@ const remove = (i: number) => {
 <style scoped>
 .quick-links {
   padding: 12px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  border-top: 1px solid var(--hair);
   max-height: 220px;
   overflow-y: auto;
 }
@@ -102,16 +102,16 @@ const remove = (i: number) => {
 }
 .ql-title {
   font-size: 12px;
-  color: rgba(238, 246, 241, 0.52);
-  letter-spacing: 0;
+  color: var(--ink-soft);
+  letter-spacing: 0.08em;
 }
 .ql-add {
-  width: 20px;
-  height: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: transparent;
-  border-radius: 6px;
-  color: rgba(255, 255, 255, 0.72);
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--edge);
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 8px;
+  color: var(--ink-regular);
   cursor: pointer;
   line-height: 1;
   font-size: 15px;
@@ -119,14 +119,21 @@ const remove = (i: number) => {
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: var(--lit-deep);
+  transition:
+    background-color var(--dur) var(--ease),
+    color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
 }
 .ql-add:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--moss-deep);
+  box-shadow: var(--lit-top), var(--lit-deep);
 }
 .ql-empty {
   font-size: 12px;
-  color: rgba(238, 246, 241, 0.46);
-  opacity: 0.6;
+  color: var(--ink-soft);
+  opacity: 0.75;
 }
 .ql-item {
   display: flex;
@@ -138,33 +145,37 @@ const remove = (i: number) => {
   flex: 1;
   min-width: 0;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.76);
+  color: var(--ink-regular);
   text-decoration: none;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: color var(--dur) var(--ease);
 }
 .ql-name:hover {
-  color: #fff;
+  color: var(--moss-deep);
 }
 .ql-del {
   width: 18px;
   height: 18px;
   border: none;
   background: transparent;
-  color: #b6bfba;
+  color: var(--ink-soft);
   cursor: pointer;
   font-size: 15px;
   line-height: 1;
-  border-radius: 4px;
+  border-radius: 6px;
   flex-shrink: 0;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition:
+    color var(--dur) var(--ease),
+    background-color var(--dur) var(--ease);
 }
 .ql-del:hover {
-  color: #c0392b;
-  background: #fbeae8;
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 </style>

@@ -108,7 +108,7 @@ const examTypes = [
   { value: 'quiz', label: '小测' },
   { value: 'popquiz', label: '随堂测验' }
 ]
-const palette = ['#2f6658', '#a47732', '#b24c3d', '#6c7a58', '#58736a', '#8d6848']
+const palette = ['#96681a', '#7d7566', '#9d4034', '#5f6f4c', '#6e7c86', '#a08a63']
 
 const examTypeLabel = (t: string) => examTypes.find((x) => x.value === t)?.label || t
 
@@ -195,7 +195,7 @@ const renderTrend = () => {
     label: {
       show: true,
       position: 'top',
-      color: '#4a514d',
+      color: '#4a5259',
       fontSize: 11,
       formatter: (p: any) => {
         const d = p.data
@@ -239,12 +239,12 @@ const renderTrend = () => {
     series[0].markLine = {
       silent: true,
       symbol: 'none',
-      lineStyle: { type: 'dashed', color: '#c2a878', width: 1.5 },
+      lineStyle: { type: 'dashed', color: '#7d7566', width: 1.5 },
       label: {
         show: true,
         formatter: `平均 ${avg}`,
         position: 'insideEndTop',
-        color: '#a8874a',
+        color: '#7d5511',
         fontSize: 11
       },
       data: [{ yAxis: avg }]
@@ -252,7 +252,7 @@ const renderTrend = () => {
   }
   // 单科目时叠加淡色面积，让走势更醒目
   if (series.length === 1) {
-    series[0].areaStyle = { color: 'rgba(91, 125, 116, 0.12)' }
+    series[0].areaStyle = { color: 'rgba(150, 104, 26, 0.12)' }
   }
 
   const chart = initChart(trendRef.value, {
@@ -276,16 +276,16 @@ const renderTrend = () => {
       type: 'category',
       data: labels,
       boundaryGap: false,
-      axisLine: { lineStyle: { color: '#dde5e1' } },
+      axisLine: { lineStyle: { color: 'rgba(26, 32, 38, 0.16)' } },
       axisTick: { show: false },
-      axisLabel: { color: '#7d8681' }
+      axisLabel: { color: '#7c858d' }
     },
     yAxis: {
       type: 'value',
       min: yMin,
       max: yMax,
-      axisLabel: { color: '#7d8681', formatter: '{value}' },
-      splitLine: { lineStyle: { color: '#eaf0ed' } }
+      axisLabel: { color: '#7c858d', formatter: '{value}' },
+      splitLine: { lineStyle: { color: 'rgba(26, 32, 38, 0.07)' } }
     },
     series
   })
@@ -301,24 +301,24 @@ const renderCompare = () => {
     xAxis: {
       type: 'category',
       data: data.map((d: any) => d.name),
-      axisLine: { lineStyle: { color: '#dde5e1' } },
+      axisLine: { lineStyle: { color: 'rgba(26, 32, 38, 0.16)' } },
       axisTick: { show: false },
-      axisLabel: { color: '#4a514d', interval: 0, rotate: data.length > 8 ? 30 : 0 }
+      axisLabel: { color: '#4a5259', interval: 0, rotate: data.length > 8 ? 30 : 0 }
     },
     yAxis: {
       type: 'value',
       min: 0,
       max: 100,
-      axisLabel: { color: '#7d8681' },
-      splitLine: { lineStyle: { color: '#eaf0ed' } }
+      axisLabel: { color: '#7c858d' },
+      splitLine: { lineStyle: { color: 'rgba(26, 32, 38, 0.07)' } }
     },
     series: [
       {
         type: 'bar',
         data: data.map((d: any) => d.avgPercent),
         barWidth: '52%',
-        itemStyle: { color: '#5b7d74', borderRadius: [6, 6, 0, 0] },
-        label: { show: true, position: 'top', color: '#7d8681', fontSize: 11 }
+        itemStyle: { color: '#96681a', borderRadius: [6, 6, 0, 0] },
+        label: { show: true, position: 'top', color: '#7c858d', fontSize: 11 }
       }
     ]
   })
@@ -332,15 +332,15 @@ const renderPie = () => {
   const chart = initChart(pieRef.value, {
     tooltip: { trigger: 'item', formatter: '{b}: {c} 人次 ({d}%)' },
     legend: { bottom: 0, icon: 'circle' },
-    color: ['#2f6658', '#6c7a58', '#a47732', '#b24c3d'],
+    color: ['#96681a', '#5f6f4c', '#7d7566', '#9d4034'],
     series: [
       {
         type: 'pie',
         radius: ['40%', '64%'],
         center: ['50%', '44%'],
         avoidLabelOverlap: true,
-        itemStyle: { borderRadius: 6, borderColor: '#fbfdfc', borderWidth: 2 },
-        label: { formatter: '{b}\n{c} 人次', fontSize: 12, color: '#3a403d' },
+        itemStyle: { borderRadius: 6, borderColor: '#fcfcfb', borderWidth: 2 },
+        label: { formatter: '{b}\n{c} 人次', fontSize: 12, color: '#4a5259' },
         data
       }
     ]

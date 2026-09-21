@@ -579,8 +579,8 @@ onMounted(() => {
     transform 0.18s ease;
 }
 .stu-card:hover {
-  border-color: var(--moss);
-  box-shadow: 0 4px 14px rgba(74, 101, 68, 0.12);
+  border-color: rgba(150, 104, 26, 0.5);
+  box-shadow: var(--shadow-hover);
   transform: translateY(-2px);
 }
 .stu-card--empty {
@@ -686,13 +686,13 @@ onMounted(() => {
   font-weight: 600;
 }
 .pct--good {
-  color: var(--moss-deep);
+  color: var(--olive);
 }
 .pct--mid {
-  color: #c2a878;
+  color: var(--ochre);
 }
 .pct--bad {
-  color: #f56c6c;
+  color: var(--el-color-danger);
 }
 .inline-tip {
   margin: 0 8px;

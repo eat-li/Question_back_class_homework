@@ -816,7 +816,7 @@ onBeforeUnmount(() => {
   z-index: 3000;
   border: none;
   border-radius: 0;
-  background: #fffdf9;
+  background: var(--paper);
   display: flex;
   flex-direction: column;
 }
@@ -829,6 +829,7 @@ onBeforeUnmount(() => {
   max-height: none;
   overflow-y: auto;
   padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.76);
 }
 .rich-editor.re-fullscreen .re-content :deep(.ProseMirror) {
   min-height: calc(100vh - 140px);
@@ -838,8 +839,8 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   gap: 2px;
   padding: 6px;
-  border-bottom: 1px solid var(--line);
-  background: #f6f1e7;
+  border-bottom: 1px solid var(--hair);
+  background: rgba(255, 255, 255, 0.5);
 }
 .re-toolbar button {
   width: 30px;
@@ -849,21 +850,25 @@ onBeforeUnmount(() => {
   justify-content: center;
   border: 1px solid transparent;
   background: transparent;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
-  color: #5a544a;
+  color: var(--ink-regular);
   padding: 0;
+  transition:
+    background-color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    color var(--dur) var(--ease);
 }
 .re-toolbar button svg {
   width: 16px;
   height: 16px;
 }
 .re-toolbar button:hover {
-  background: #ede5d4;
+  background: rgba(255, 255, 255, 0.85);
 }
 .re-toolbar button.active {
   background: var(--moss-soft);
-  border-color: #cfe0d2;
+  border-color: rgba(150, 104, 26, 0.32);
   color: var(--moss-deep);
 }
 .re-content {
@@ -911,13 +916,13 @@ onBeforeUnmount(() => {
 }
 .re-content :deep(th),
 .re-content :deep(td) {
-  border: 1px solid #d0c9bd;
+  border: 1px solid var(--line);
   padding: 6px 10px;
   vertical-align: top;
   text-align: left;
 }
 .re-content :deep(th) {
-  background: #f3eddf;
+  background: rgba(255, 255, 255, 0.55);
   font-weight: 600;
 }
 .re-content :deep(.selectedCell) {
@@ -951,7 +956,7 @@ onBeforeUnmount(() => {
   position: fixed;
   inset: 0;
   z-index: 3000;
-  background: rgba(40, 35, 30, 0.82);
+  background: rgba(24, 30, 36, 0.82);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1006,8 +1011,8 @@ onBeforeUnmount(() => {
   font-size: 13px;
   font-weight: 600;
   color: var(--ink);
-  background: #f6f1e7;
-  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.55);
+  border-bottom: 1px solid var(--hair);
 }
 .ai-preview-body {
   flex: 1;
@@ -1017,7 +1022,7 @@ onBeforeUnmount(() => {
   line-height: 1.8;
   color: var(--ink);
   word-break: break-word;
-  background: #fffdf9;
+  background: rgba(255, 255, 255, 0.76);
 }
 .ai-preview-body p {
   margin: 0 0 4px;
@@ -1029,11 +1034,11 @@ onBeforeUnmount(() => {
 }
 .ai-preview-body th,
 .ai-preview-body td {
-  border: 1px solid #d8d2c4;
+  border: 1px solid var(--line);
   padding: 5px 9px;
 }
 .ai-preview-body th {
-  background: #f3eddf;
+  background: rgba(255, 255, 255, 0.55);
   font-weight: 600;
 }
 .ai-preview-body img {

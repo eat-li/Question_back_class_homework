@@ -604,12 +604,14 @@ const exportPdf = () => {
   width: 660px;
   margin: 0 auto;
   padding: 34px 40px 26px;
+  /* 卡片内部颜色/字体写死：它是导出 PNG 的目标，必须与导出结果完全一致，
+     只有卡片外部的投影属于界面层，可以跟随主题。 */
   background: #ffffff;
   color: #222;
   font-family: 'Times New Roman', 'Times', '宋体', 'SimSun', serif;
   font-size: 15px;
   line-height: 1.9;
-  box-shadow: 0 2px 14px rgba(90, 76, 55, 0.16);
+  box-shadow: 0 2px 14px rgba(24, 30, 36, 0.14);
 }
 .summary-card__head {
   padding-bottom: 12px;

@@ -8,15 +8,15 @@
         xmlns="http://www.w3.org/2000/svg"
       >
         <g font-family="Georgia, 'Times New Roman', 'Songti SC', serif">
-          <text x="96" y="214" font-size="150" fill="rgba(91,125,116,0.14)">∫</text>
-          <text x="1190" y="168" font-size="122" fill="rgba(91,125,116,0.12)">∑</text>
-          <text x="1178" y="806" font-size="152" fill="rgba(91,125,116,0.12)">π</text>
-          <text x="92" y="788" font-size="124" fill="rgba(91,125,116,0.13)">√</text>
-          <text x="622" y="158" font-size="92" fill="rgba(91,125,116,0.11)">x²</text>
-          <text x="556" y="836" font-size="84" fill="rgba(91,125,116,0.11)">½</text>
-          <text x="352" y="430" font-size="84" fill="rgba(91,125,116,0.11)">f(x)</text>
+          <text x="96" y="214" font-size="150" fill="rgba(26,32,38,0.10)">∫</text>
+          <text x="1190" y="168" font-size="122" fill="rgba(26,32,38,0.085)">∑</text>
+          <text x="1178" y="806" font-size="152" fill="rgba(26,32,38,0.10)">π</text>
+          <text x="92" y="788" font-size="124" fill="rgba(26,32,38,0.10)">√</text>
+          <text x="622" y="158" font-size="92" fill="rgba(26,32,38,0.075)">x²</text>
+          <text x="556" y="836" font-size="84" fill="rgba(26,32,38,0.075)">½</text>
+          <text x="352" y="430" font-size="84" fill="rgba(26,32,38,0.075)">f(x)</text>
         </g>
-        <g fill="none" stroke="rgba(91,125,116,0.16)" stroke-linecap="round">
+        <g fill="none" stroke="rgba(26,32,38,0.11)" stroke-linecap="round">
           <!-- 抛物线 + 坐标轴 -->
           <path d="M 1060 430 Q 1140 250 1280 398" stroke-width="2" />
           <path d="M 1076 430 Q 1140 300 1260 398" stroke-width="1" opacity="0.7" />
@@ -127,27 +127,13 @@ const submit = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--paper);
+  background: transparent; /* 底色与方格纸由 body 统一铺，这里不再叠第二层网格 */
   overflow: hidden;
-}
-
-/* 田字格纹理（草稿纸感） */
-.login-page::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(91, 125, 116, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(91, 125, 116, 0.05) 1px, transparent 1px);
-  background-size: 28px 28px;
-  opacity: 0.72;
-  pointer-events: none;
 }
 
 .login-art {
   position: absolute;
   inset: 0;
-  color: var(--moss);
   pointer-events: none;
 }
 .login-art svg {
@@ -165,8 +151,7 @@ const submit = async () => {
 .login-card {
   width: 400px;
   padding: 26px 12px 20px;
-  border-top: 3px solid var(--moss-deep);
-  animation: rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: rise 0.5s var(--ease) both;
 }
 @keyframes rise {
   from {
@@ -189,6 +174,7 @@ const submit = async () => {
   align-items: center;
   gap: 14px;
 }
+/* 整页唯一的实心琥珀金块，作为视觉落点 */
 .login-mark {
   width: 48px;
   height: 48px;
@@ -196,31 +182,33 @@ const submit = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 5px;
-  background: var(--moss-deep);
-  color: #fffdf9;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #a4761f, #855a10);
+  color: var(--on-accent);
   font-family: var(--font-display);
   font-size: 27px;
   font-weight: 700;
-  box-shadow: 0 4px 12px rgba(36, 72, 63, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42), inset 0 -1px 0 rgba(72, 49, 6, 0.34),
+    0 8px 18px -10px rgba(110, 78, 16, 0.9);
 }
 .login-title {
   font-family: var(--font-display);
-  font-size: 22px;
+  font-size: 23px;
   font-weight: 700;
   color: var(--ink);
-  letter-spacing: 0;
+  letter-spacing: 0.06em;
 }
 .login-sub {
   margin-top: 3px;
   font-size: 12px;
   color: var(--ink-soft);
-  letter-spacing: 0;
+  letter-spacing: 0.16em;
 }
 
+/* 试卷抬头式的细分隔线 */
 .login-rule {
   height: 1px;
-  background: var(--line);
+  background: var(--hair);
   margin: 20px 0 18px;
 }
 
@@ -228,7 +216,7 @@ const submit = async () => {
   font-family: var(--font-display);
   font-size: 13px;
   color: var(--ink-soft);
-  letter-spacing: 0;
+  letter-spacing: 0.22em;
   margin-bottom: 14px;
   text-align: center;
 }

@@ -533,7 +533,7 @@ watch(
 .sub-chip.active {
   background: var(--moss);
   border-color: var(--moss);
-  color: #fffdf9;
+  color: var(--on-accent);
   font-weight: 600;
 }
 /* 二级知识点编辑入口：平时淡隐，鼠标悬停到芯片上才显现，避免干扰筛选点击 */
@@ -563,9 +563,9 @@ watch(
 .sub-filters.dragging .sub-chip:hover {
   background: var(--moss);
   border-style: solid;
-  color: #fffdf9;
+  color: var(--on-accent);
   transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(91, 125, 116, 0.3);
+  box-shadow: 0 4px 10px rgba(110, 78, 16, 0.34);
 }
 .sub-filters__drag-tip {
   font-size: 12px;
@@ -602,7 +602,7 @@ watch(
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #555;
+  color: var(--ink-regular);
   font-size: 13px;
 }
 .pager {

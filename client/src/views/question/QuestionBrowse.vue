@@ -248,8 +248,11 @@ onMounted(() => {
 }
 
 .q-card {
-  background: #fffdf9;
-  border: 1px solid var(--line);
+  background-color: transparent;
+  background-image: linear-gradient(180deg, var(--glass-bg-strong), var(--glass-bg));
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--edge);
   border-radius: var(--radius);
   padding: 18px 22px;
   box-shadow: var(--shadow-soft);
@@ -290,12 +293,12 @@ onMounted(() => {
   color: var(--moss-deep);
 }
 .type-fill {
-  background: #f3eddf;
-  color: #a8874a;
+  background: rgba(125, 117, 102, 0.13);
+  color: #5c5648;
 }
 .type-solve {
-  background: #e7ebe3;
-  color: #56634d;
+  background: rgba(95, 111, 76, 0.13);
+  color: #4c593d;
 }
 .q-diff {
   color: var(--accent);
@@ -372,7 +375,7 @@ onMounted(() => {
 .q-answer {
   margin-top: 12px;
   padding: 12px 16px;
-  background: #f8f4ec;
+  background: rgba(255, 255, 255, 0.6);
   border-left: 3px solid var(--moss);
   border-radius: 8px;
   display: flex;
@@ -381,7 +384,7 @@ onMounted(() => {
 }
 .answer-label {
   font-weight: 700;
-  color: #c0392b;
+  color: var(--accent);
   margin-bottom: 6px;
 }
 

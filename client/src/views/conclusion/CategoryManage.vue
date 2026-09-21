@@ -338,7 +338,7 @@ onMounted(load)
   transition: background-color 0.18s ease;
 }
 .cat-tree :deep(.el-tree-node__content):hover {
-  background: #e7efec;
+  background: rgba(255, 255, 255, 0.62);
 }
 .cat-tree :deep(.el-tree-node.is-current > .el-tree-node__content) {
   background: var(--moss-soft);
@@ -407,15 +407,15 @@ onMounted(load)
     color 0.15s ease;
 }
 .tree-node__icon:hover {
-  background: #fffdf9;
+  background: rgba(255, 255, 255, 0.85);
   color: var(--moss-deep);
 }
 .tree-node__icon--danger {
-  color: #d9534f;
+  color: var(--accent);
 }
 .tree-node__icon--danger:hover {
-  background: #fdecec;
-  color: #c0392b;
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 /* 空状态 */
