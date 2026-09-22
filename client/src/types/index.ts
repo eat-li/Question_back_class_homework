@@ -143,6 +143,12 @@ export interface AiConfig {
 
 export interface AiFormatPayload {
   text: string
+  /**
+   * 这段内容属于哪个字段：
+   * stem=题干、body=补充说明、answer=答案与解析、auto=未知（按题干处理）。
+   * 后端据此判断「多出来的答案解析」要不要删——answer 字段本身就是答案，绝不能删。
+   */
+  field?: 'stem' | 'body' | 'answer' | 'auto'
   apiKey?: string
   baseUrl?: string
   model?: string

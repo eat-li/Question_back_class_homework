@@ -4,12 +4,13 @@
 const { ok, fail } = require('../utils/response')
 const { Homework, HomeworkQuestion, Question, Student } = require('../models')
 
-const SYSTEM_PROMPT = `你是数学老师专用的题目排版助手。用户会粘贴一道数学题（可能包含题干、选项、答案等，格式较乱）。请把它整理成规范的 HTML 富文本，用于网页展示。要求：
+const SYSTEM_PROMPT = `你是数学老师专用的题目排版助手。用户会给你一段已经写好的内容（可能只是题干，也可能是题干+选项，或者答案与解析），请把它整理成规范的 HTML 富文本，用于网页展示。要求：
 
-1. 结构清晰：题干单独一个 <p>；选择题选项（A/B/C/D…）每个单独一行，写成 <p>A. …</p>；答案与解析放在最后，用 <p><strong>答案：</strong>…</p> 的形式。
-2. 数学公式（重点）：所有公式一律用 $...$（行内）或 $$...$$（独立成行）包裹。分式用 \\dfrac{分子}{分母}；根号用 \\sqrt{...}；上下标用 ^ 与 _（如 x^2、a_{1}）；希腊字母用 \\alpha \\beta \\gamma \\theta \\lambda \\pi \\sigma \\varphi 等；常用符号用 \\ge \\le \\ne \\pm \\times \\div \\in \\subset \\cup \\cap \\infty \\sum \\prod \\rightarrow 等。
-3. 禁止事项：严禁输出 Unicode 数学符号（如 ² ³ √ ∑ ≥ ≤ ≠ ½ α β），必须全部转成 LaTeX 命令；严禁在公式外面使用 $ 字符；严禁改变题目中的任何数字、条件、符号或文字；不翻译、不补全、不改写题意。
-4. 输出：只输出排版后的 HTML 片段本身——不要 <html>、<body>、<head> 等外层标签，不要用 \`\`\` 代码块标记包裹，不要任何解释说明或客套话。`
+1. 只整理用户给出的内容，一个字都不许新增。用户没写的选项、条件、答案、解析、结论、评注，输出里一个都不能出现；也不要补全、不要改写题意、不要翻译。原文没有答案或解析时，输出里绝对不能出现「答案：」「解析：」这类段落——这是最容易犯的错，务必避免。
+2. 结构清晰：正文（题干）单独一个 <p>；原文若有选择题选项（A/B/C/D…），每个选项单独一行，写成 <p>A. …</p>；原文若本来就带答案与解析，保留它们并规范成 <p><strong>答案：</strong>…</p> 的形式。
+3. 数学公式（重点）：所有公式一律用 $...$（行内）或 $$...$$（独立成行）包裹。分式用 \\dfrac{分子}{分母}；根号用 \\sqrt{...}；上下标用 ^ 与 _（如 x^2、a_{1}）；希腊字母用 \\alpha \\beta \\gamma \\theta \\lambda \\pi \\sigma \\varphi 等；常用符号用 \\ge \\le \\ne \\pm \\times \\div \\in \\subset \\cup \\cap \\infty \\sum \\prod \\rightarrow 等。
+4. 禁止事项：严禁输出 Unicode 数学符号（如 ² ³ √ ∑ ≥ ≤ ≠ ½ α β），必须全部转成 LaTeX 命令；严禁在公式外面使用 $ 字符；严禁改变原文中的任何数字、条件、符号或文字。
+5. 输出：只输出排版后的 HTML 片段本身——不要 <html>、<body>、<head> 等外层标签，不要用 \`\`\` 代码块标记包裹，不要任何解释说明或客套话。`
 
 const LESSON_PROMPT = `你是数学老师专用的教学助理。下面会给出一位学生某次课所布置作业的题目清单（含题型与知识点）。请据此写一份「课时总结」，用于发给家长与学生。要求：
 
@@ -196,6 +197,73 @@ function plainText(html) {
     .trim()
 }
 
+/* ===================== 答案泄漏兜底 ===================== */
+// 背景：提示词写得再严，模型偶尔仍会在「题干」里凭空补出一段答案与解析。
+// 题干会被题库列表、作业预览、PDF 导出直接展示，答案漏出去等于泄题，
+// 所以这里做一道确定性兜底，而不是只靠模型自觉。
+
+// 原文里出现这些字样，说明用户排版的本来就是答案内容（或在题干里提到了答案），不做任何删除
+const ANSWER_HINT_RE = /答案|解析|参考解答|参考答案/
+
+// 「整段就是答案」的判定：答案标记必须出现在这一段的开头。
+// 不能用「包含」——否则「…求 f(2) 的值。答案：5」这种把答案跟在正文后面的段落会被整段误删。
+const ANSWER_HEAD_RE =
+  /^\s*(?:【\s*(?:参考)?(?:答案|解析|解答)\s*】|(?:参考)?(?:答案|解析)(?:\s*[：:]|\s*$)|解\s*[：:])/
+
+// 行内答案标记：句末标点或换行之后紧跟「答案：」「解析：」这类字样。
+// 第一组捕获句末标点本身，截断时把它留在原地，否则会把正文的句号一起切掉。
+const ANSWER_INLINE_RE =
+  /((?:[。；;！？!?]|<br\s*\/?>)\s*)(?:(?:<[^>]+>\s*)*(?:【\s*)?(?:参考)?(?:答案|解析)(?:\s*】)?\s*[：:])/
+
+const VOID_TAGS = new Set(['br', 'img', 'hr', 'input', 'meta', 'link', 'source', 'col'])
+
+// 截断很可能切在段落中间，留下未闭合的标签；配平一下，让返回的 HTML 结构完整。
+// （模型输出通常是扁平的 p / strong / br，简单栈配平足够）
+function balanceTags(html) {
+  const open = []
+  const re = /<(\/?)([a-zA-Z][\w-]*)(?:\s[^>]*)?>/g
+  let m
+  while ((m = re.exec(html))) {
+    const name = m[2].toLowerCase()
+    if (VOID_TAGS.has(name)) continue
+    if (m[1] === '/') {
+      const i = open.lastIndexOf(name)
+      if (i >= 0) open.splice(i, 1)
+    } else {
+      open.push(name)
+    }
+  }
+  return html + open.reverse().map((n) => `</${n}>`).join('')
+}
+
+// 去掉模型凭空补出的答案解析；field === 'answer' 时整段内容本来就是答案，直接放行。
+// 返回空串表示「整份结果都是多余的答案」，由调用方报错，避免把答案静默写进题干。
+function stripUnrequestedAnswer(sourceText, html, field) {
+  if (String(field || '') === 'answer') return html
+  if (!html) return html
+  // 原文自带答案 → 交给模型按格式规范化，不删
+  if (ANSWER_HINT_RE.test(plainText(sourceText))) return html
+
+  // 原文完全没有「答案 / 解析」字样，因此输出里出现的任何一处都是模型自己加的。
+  // 先按块级标签切开，从第一段「以答案标记开头」的段落起整体截掉。
+  const blocks = html.split(/(?<=<\/(?:p|div|li|h[1-6]|blockquote|td|tr)>)/i)
+  let cut = blocks.length
+  for (let i = 0; i < blocks.length; i++) {
+    if (ANSWER_HEAD_RE.test(plainText(blocks[i]))) {
+      cut = i
+      break
+    }
+  }
+  let kept = cut < blocks.length ? blocks.slice(0, cut).join('') : html
+
+  // 答案跟在正文同一段里（如「…求 f(2) 的值。答案：5」）时，从标记处截断，句末标点保留
+  const inline = ANSWER_INLINE_RE.exec(kept)
+  if (inline) kept = kept.slice(0, inline.index + inline[1].length)
+
+  kept = kept.trim()
+  return kept ? balanceTags(kept) : ''
+}
+
 // 解析课时总结 JSON；模型没按格式输出时兜底为整段「上课内容」
 function parseLessonJson(raw) {
   const text = String(raw || '')
@@ -247,7 +315,9 @@ exports.config = async (req, res, next) => {
 exports.format = async (req, res, next) => {
   let targetBase = ''
   try {
-    const { text, apiKey, baseUrl, model } = req.body || {}
+    // field 告知这段内容属于哪个字段：题干 stem / 补充说明 body / 答案与解析 answer。
+    // 只有知道字段身份，才能安全判断「多出来的答案解析」该不该删。
+    const { text, field, apiKey, baseUrl, model } = req.body || {}
     if (!text || !String(text).trim()) return fail(res, 40000, '没有可排版的题目内容')
 
     const target = resolveAiTarget({ apiKey, baseUrl, model })
@@ -261,8 +331,17 @@ exports.format = async (req, res, next) => {
         { role: 'user', content: String(text) }
       ]
     })
-    const html = cleanAiHtml(raw)
+    let html = cleanAiHtml(raw)
     if (!html) return fail(res, 50200, 'AI 未返回排版结果')
+
+    html = stripUnrequestedAnswer(String(text), html, field)
+    if (!html) {
+      return fail(
+        res,
+        50200,
+        'AI 返回的内容全是原文里没有的答案解析，已全部丢弃，未写入编辑器；请重试或改用「本地修复公式」'
+      )
+    }
 
     ok(res, { html }, '排版完成')
   } catch (e) {

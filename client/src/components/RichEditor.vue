@@ -349,7 +349,15 @@ import {
 } from '../utils/mathRender'
 import { normalizeAiMathHtml, validateAiMath } from '../utils/aiMath'
 
-const props = defineProps<{ modelValue: string }>()
+const props = defineProps<{
+  modelValue: string
+  /**
+   * 告诉 AI 排版「这个编辑器装的是哪个字段」。
+   * 题干/补充说明里出现的答案是模型凭空补的，后端会删掉；
+   * 答案与解析字段本身就是答案，必须传 answer，否则排版结果会被误删。
+   */
+  aiField?: 'stem' | 'body' | 'answer' | 'auto'
+}>()
 const emit = defineEmits<{ (e: 'update:modelValue', v: string): void }>()
 
 const fileInput = ref<HTMLInputElement>()
@@ -422,7 +430,7 @@ const runAiFormat = async () => {
   }
 
   const cfg = loadAiConfig()
-  let payload: any = { text }
+  let payload: any = { text, field: props.aiField || 'auto' }
 
   if (cfg.apiKey) {
     // 前端本地配置优先

@@ -8,7 +8,7 @@
   >
     <el-form :model="form" label-width="110px">
       <el-form-item label="题干">
-        <RichEditor v-model="form.title" />
+        <RichEditor v-model="form.title" ai-field="stem" />
       </el-form-item>
       <el-form-item label="题型">
         <el-select v-model="form.type" style="width: 100%">
@@ -51,10 +51,10 @@
         <div class="form-tip">二级知识点归属于某个一级知识点，直接输入新名称即可新增；一级为空时不可选。</div>
       </el-form-item>
       <el-form-item label="补充说明">
-        <RichEditor v-model="form.body" />
+        <RichEditor v-model="form.body" ai-field="body" />
       </el-form-item>
       <el-form-item label="答案与解析">
-        <RichEditor v-model="form.answer" />
+        <RichEditor v-model="form.answer" ai-field="answer" />
       </el-form-item>
     </el-form>
     <template #footer>
