@@ -6,7 +6,7 @@
         <div class="block-title">备份题目与作业</div>
       </template>
       <p class="desc">
-        把全部数据（学生、题目、作业、成绩、知识点分类、结论）打包成一个压缩包下载。建议定期下载并存到
+        把全部数据（学生、题目、作业、成绩、知识点分类、结论、课时总结）打包成一个压缩包下载。建议定期下载并存到
         U 盘或网盘，电脑出问题时可以据此恢复。
       </p>
       <el-button type="primary" :icon="Download" :loading="backupLoading" @click="downloadBackup">
