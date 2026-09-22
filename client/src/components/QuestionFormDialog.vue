@@ -33,6 +33,9 @@
         >
           <el-option v-for="t in knowledgeOptions" :key="t" :label="t" :value="t" />
         </el-select>
+        <div class="form-tip">
+          列表只列出题库里已经用过的知识点；要新建直接输入名称后回车即可。
+        </div>
       </el-form-item>
       <el-form-item label="二级知识点">
         <el-select
@@ -65,7 +68,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getQuestionTags, getQuestionSubTags, createQuestion, updateQuestion } from '../api/question'
 import RichEditor from './RichEditor.vue'
@@ -79,21 +82,19 @@ const emit = defineEmits<{
 const form = reactive<any>({})
 const saving = ref(false)
 
-// 知识点预设选项（新增题目时快速选择，也可自行输入）
-const knowledgePresets = [
-  '函数',
-  '解析几何',
-  '立体几何',
-  '概率统计',
-  '数列',
-  '三角函数',
-  '导数',
-  '向量',
-  '不等式',
-  '集合与逻辑'
-]
-const knowledgeOptions = ref<string[]>([...knowledgePresets])
+// 一级知识点候选：只取题库里已经用过的知识点，不再内置预设项，
+// 避免下拉里混进一堆从没使用过的名字。需要新建时直接输入名称即可（allow-create）。
+const knowledgeOptions = ref<string[]>([])
 const subKnowledgeOptions = ref<string[]>([])
+
+// 拉取题库里已经用过的知识点作为候选
+const loadTags = async () => {
+  try {
+    knowledgeOptions.value = await getQuestionTags()
+  } catch {
+    knowledgeOptions.value = []
+  }
+}
 
 // 按当前一级知识点加载其下已有的二级知识点
 const loadSubTags = async () => {
@@ -137,7 +138,11 @@ const initForm = () => {
 watch(
   () => props.modelValue,
   (v) => {
-    if (v) initForm()
+    if (v) {
+      initForm()
+      // 每次打开都重新拉取：刚新建过的知识点要能立刻出现在候选里
+      loadTags()
+    }
   }
 )
 
@@ -157,18 +162,6 @@ const save = async () => {
     saving.value = false
   }
 }
-
-const loadTags = async () => {
-  try {
-    const tags = await getQuestionTags()
-    // 预设 + 题库里已用过的知识点，合并去重
-    knowledgeOptions.value = Array.from(new Set([...knowledgePresets, ...tags]))
-  } catch {
-    /* 忽略，保留预设选项 */
-  }
-}
-
-onMounted(loadTags)
 </script>
 
 <style scoped>

@@ -33,7 +33,7 @@
         </div>
         <div v-if="g.subTags && g.subTags.length" class="kb-card__subs">
           <span
-            v-for="s in g.subTags"
+            v-for="s in sortedSubs(g)"
             :key="s.name"
             class="kb-card__sub"
             @click.stop="goSubKnowledge(g.tag, s.name)"
@@ -80,6 +80,11 @@ const loading = ref(false)
 const keyword = ref('')
 const dialogVisible = ref(false)
 const groups = ref<QuestionStats[]>([])
+
+// 二级知识点全部平铺展示、不做折叠，卡片按内容自然撑开；
+// 只按题量降序排列，让常用的排在前面，数量多时更好扫读。
+const sortedSubs = (g: QuestionStats) =>
+  [...(g.subTags || [])].sort((a, b) => b.total - a.total)
 
 // —— 二级知识点编辑（重命名 / 合并 / 删除 / 换题库）——
 const subEditVisible = ref(false)
@@ -159,8 +164,15 @@ onMounted(load)
 }
 .kb-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  /*
+   * 卡片再放大一档：最小列宽 220→260px，实测卡片宽 239→302px、每行 4 张。
+   * 302px 卡片的内宽约 266px，正好容下两个二级标签（每个约 100px + 间距），
+   * 二级全部平铺时行数减半，卡片被撑高的幅度也随之变小。
+   */
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 16px;
+  /* 二级很多的卡片自己撑高，不拉伸同排其它卡 */
+  align-items: start;
 }
 .kb-card {
   border: 1px solid var(--edge);
