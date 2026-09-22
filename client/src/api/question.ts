@@ -21,6 +21,23 @@ export function getQuestions(params?: QuestionQuery): Promise<Question[] | PageR
   return request.get('/questions', { params }) as Promise<Question[] | PageResult<Question>>
 }
 
+/**
+ * 取符合条件的全部题目，供 PDF 导出使用。
+ * 不传分页参数时后端单次最多返回 1000 条，题库变大后导出会被悄悄截断；
+ * 这里按 100 条一页循环取完，页数由首次返回的 total 决定。
+ */
+export const getAllQuestions = async (params: QuestionQuery = {}): Promise<Question[]> => {
+  const size = 100
+  const first = await getQuestions({ ...params, page: 1, pageSize: size })
+  const all: Question[] = [...first.list]
+  const pages = Math.ceil(first.total / size)
+  for (let p = 2; p <= pages; p++) {
+    const res = await getQuestions({ ...params, page: p, pageSize: size })
+    all.push(...res.list)
+  }
+  return all
+}
+
 export const getQuestionStats = (params?: { keyword?: string }): Promise<QuestionStats[]> =>
   request.get('/questions/stats', { params })
 export const getQuestionTags = (): Promise<string[]> => request.get('/questions/tags')
