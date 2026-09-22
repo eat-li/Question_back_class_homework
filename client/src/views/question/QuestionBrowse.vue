@@ -40,6 +40,7 @@
         </el-select>
         <el-button type="primary" :icon="Search" @click="search">查询</el-button>
         <el-button :icon="RefreshLeft" @click="reset">重置</el-button>
+        <el-button :icon="Download" @click="exportVisible = true">导出 PDF</el-button>
         <span class="count">共 {{ total }} 题</span>
       </div>
     </el-card>
@@ -48,41 +49,12 @@
     <div v-loading="loading" class="q-list">
       <el-empty v-if="!loading && !list.length" description="没有符合条件的题目" />
 
-      <div v-for="(q, idx) in list" :key="q.id" class="q-card">
-        <div class="q-head">
-          <span class="q-no">{{ (page - 1) * pageSize + idx + 1 }}</span>
-          <span class="q-type" :class="`type-${q.type}`">{{ typeLabel(q.type) }}</span>
-          <span class="q-diff" :title="`难度 ${q.difficulty || 0}/5`">
-            {{ '★'.repeat(q.difficulty || 0) || '—' }}
-          </span>
-          <span v-if="q.knowledgeTag" class="q-tag">{{ q.knowledgeTag }}</span>
-          <span v-if="q.knowledgeSubTag" class="q-tag q-tag--sub">{{ q.knowledgeSubTag }}</span>
-        </div>
-
-        <div class="q-title" @click="onContentClick"><RichContent :html="q.title || ''" /></div>
-
-        <div v-if="q.body" class="q-body" @click="onContentClick">
-          <RichContent :html="q.body" />
-        </div>
-
-        <div v-if="q.options && q.options.length" class="q-options">
-          <div v-for="(o, j) in q.options" :key="j" class="opt">
-            <span class="opt-letter">{{ String.fromCharCode(65 + j) }}.</span>
-            <span>{{ typeof o === 'string' ? o : JSON.stringify(o) }}</span>
-          </div>
-        </div>
-
-        <div class="q-foot">
-          <el-button link type="primary" @click="toggleExpand(q.id)">
-            {{ expanded.has(q.id) ? '收起答案与解析' : '查看答案与解析' }}
-          </el-button>
-        </div>
-
-        <div v-if="expanded.has(q.id)" class="q-answer" @click="onContentClick">
-          <div class="answer-label">答案与解析</div>
-          <RichContent :html="q.answer || ''" />
-        </div>
-      </div>
+      <QuestionCard
+        v-for="(q, idx) in list"
+        :key="q.id"
+        :question="q"
+        :no="(page - 1) * pageSize + idx + 1"
+      />
     </div>
 
     <!-- 分页 -->
@@ -97,20 +69,23 @@
       />
     </div>
 
-    <!-- 图片放大预览 -->
-    <el-dialog v-model="previewVisible" title="查看原图" width="70%" top="6vh" append-to-body>
-      <div class="img-preview">
-        <img :src="previewUrl" alt="题目图片" />
-      </div>
-    </el-dialog>
+    <!-- 导出当前筛选结果为 PDF -->
+    <QuestionExportDialog
+      v-model="exportVisible"
+      :scope="exportScope"
+      :scope-label="exportLabel"
+      allow-group
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { Search, RefreshLeft } from '@element-plus/icons-vue'
+import { ref, computed, onMounted } from 'vue'
+import { Search, RefreshLeft, Download } from '@element-plus/icons-vue'
 import { getQuestions, getQuestionTags, getQuestionSubTags } from '../../api/question'
-import RichContent from '../../components/RichContent.vue'
+import type { QuestionQuery } from '../../api/question'
+import QuestionCard from '../../components/QuestionCard.vue'
+import QuestionExportDialog from '../../components/QuestionExportDialog.vue'
 import type { Question } from '../../types'
 
 const typeMap: Record<string, string> = {
@@ -149,48 +124,41 @@ const page = ref(1)
 const pageSize = 10
 const total = ref(0)
 
-// 答案/解析展开状态
-const expanded = ref(new Set<number>())
-
-const typeLabel = (t: string) => typeMap[t] || t
-
-const toggleExpand = (id: number) => {
-  const next = new Set(expanded.value)
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
-  expanded.value = next
-}
-
-// 图片放大预览
-const previewVisible = ref(false)
-const previewUrl = ref('')
-const onContentClick = (e: MouseEvent) => {
-  const target = e.target as HTMLElement
-  if (target.tagName === 'IMG') {
-    const src = target.getAttribute('src')
-    if (src) {
-      previewUrl.value = src
-      previewVisible.value = true
-    }
-  }
+// 当前筛选条件：列表查询与 PDF 导出共用同一份，避免两处逻辑走样
+const currentFilters = (): QuestionQuery => {
+  const params: QuestionQuery = {}
+  if (keyword.value) params.keyword = keyword.value
+  if (type.value) params.type = type.value
+  if (difficulty.value) params.difficulty = Number(difficulty.value)
+  if (knowledgeTag.value) params.knowledgeTag = knowledgeTag.value
+  if (subTag.value) params.knowledgeSubTag = subTag.value
+  return params
 }
 
 const load = async () => {
   loading.value = true
   try {
-    const params: any = { page: page.value, pageSize }
-    if (keyword.value) params.keyword = keyword.value
-    if (type.value) params.type = type.value
-    if (difficulty.value) params.difficulty = difficulty.value
-    if (knowledgeTag.value) params.knowledgeTag = knowledgeTag.value
-    if (subTag.value) params.knowledgeSubTag = subTag.value
-    const res = await getQuestions(params)
+    const res = await getQuestions({ ...currentFilters(), page: page.value, pageSize })
     list.value = res.list
     total.value = res.total
   } finally {
     loading.value = false
   }
 }
+
+// —— 导出 PDF（当前筛选结果）——
+const exportVisible = ref(false)
+const exportScope = computed(() => currentFilters())
+const exportLabel = computed(() => {
+  const f = exportScope.value
+  const parts: string[] = []
+  if (f.knowledgeTag)
+    parts.push(f.knowledgeSubTag ? `${f.knowledgeTag} › ${f.knowledgeSubTag}` : f.knowledgeTag)
+  if (f.type) parts.push(typeMap[f.type] || f.type)
+  if (f.difficulty) parts.push(`难度 ${f.difficulty} 星`)
+  if (f.keyword) parts.push(`含「${f.keyword}」`)
+  return parts.length ? parts.join(' · ') : '全部题目'
+})
 
 // 查询/重置时回到第一页
 const search = () => {
@@ -240,152 +208,12 @@ onMounted(() => {
   font-size: 13px;
 }
 
+/* 题目卡片的本体样式已抽到 components/QuestionCard.vue，这里只管列表间距 */
 .q-list {
   display: flex;
   flex-direction: column;
   gap: 14px;
   min-height: 200px;
-}
-
-.q-card {
-  background-color: transparent;
-  background-image: linear-gradient(180deg, var(--glass-bg-strong), var(--glass-bg));
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--edge);
-  border-radius: var(--radius);
-  padding: 18px 22px;
-  box-shadow: var(--shadow-soft);
-  transition: box-shadow 0.25s ease;
-  max-height: 70vh;
-  overflow-y: auto;
-}
-.q-card:hover {
-  box-shadow: var(--shadow-hover);
-}
-
-.q-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-.q-no {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: var(--moss-soft);
-  color: var(--moss-deep);
-  font-weight: 700;
-  font-size: 14px;
-}
-.q-type {
-  font-size: 12px;
-  padding: 2px 10px;
-  border-radius: 999px;
-  font-weight: 600;
-}
-.type-choice {
-  background: var(--moss-soft);
-  color: var(--moss-deep);
-}
-.type-fill {
-  background: rgba(125, 117, 102, 0.13);
-  color: #5c5648;
-}
-.type-solve {
-  background: rgba(95, 111, 76, 0.13);
-  color: #4c593d;
-}
-.q-diff {
-  color: var(--accent);
-  font-size: 13px;
-  letter-spacing: 1px;
-}
-.q-tag {
-  font-size: 12px;
-  color: var(--ink-soft);
-  background: var(--paper-deep);
-  padding: 2px 10px;
-  border-radius: 999px;
-}
-.q-tag--sub {
-  color: var(--moss-deep);
-  background: var(--moss-soft);
-}
-
-.q-title {
-  font-size: 15px;
-  color: var(--ink);
-  line-height: 1.8;
-}
-/* 限制卡片内图片大小，避免大图撑满整屏 */
-.q-title :deep(img),
-.q-body :deep(img),
-.q-answer :deep(img) {
-  max-width: 100%;
-  max-height: 360px;
-  object-fit: contain;
-  cursor: zoom-in;
-}
-
-.img-preview {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  max-height: 72vh;
-  overflow: auto;
-}
-.img-preview img {
-  max-width: 100%;
-  max-height: 72vh;
-  object-fit: contain;
-}
-.q-body {
-  margin-top: 6px;
-  font-size: 14px;
-}
-
-.q-options {
-  margin: 10px 0 0 22px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.opt {
-  font-size: 14px;
-  color: var(--ink);
-  line-height: 1.7;
-}
-.opt-letter {
-  font-weight: 600;
-  color: var(--moss-deep);
-  margin-right: 4px;
-}
-
-.q-foot {
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--line);
-}
-
-.q-answer {
-  margin-top: 12px;
-  padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.6);
-  border-left: 3px solid var(--moss);
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.answer-label {
-  font-weight: 700;
-  color: var(--accent);
-  margin-bottom: 6px;
 }
 
 .pager {

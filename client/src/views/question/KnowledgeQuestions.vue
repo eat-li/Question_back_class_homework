@@ -1,19 +1,16 @@
 <template>
   <el-card>
+    <!-- 第一行：返回 + 题库名 + 题量 -->
     <div class="toolbar">
       <el-button link type="primary" :icon="ArrowLeft" @click="goBack">返回题库</el-button>
       <span class="title">{{ tagLabel }}</span>
-      <el-tooltip
-        v-if="tag !== '__empty__'"
-        content="重命名题库"
-        placement="top"
-        :show-after="400"
-      >
+      <el-tooltip v-if="tag !== '__empty__'" content="重命名题库" placement="top" :show-after="400">
         <el-icon class="toolbar-rename" @click="renameCurrentTag"><EditPen /></el-icon>
       </el-tooltip>
       <span class="count">共 {{ total }} 题</span>
     </div>
 
+    <!-- 第二行：只有筛选；导出选项收进导出对话框，不再和筛选挤一行 -->
     <div class="filters">
       <el-radio-group v-model="type" @change="search">
         <el-radio-button value="all">全部</el-radio-button>
@@ -31,119 +28,118 @@
         <el-option v-for="n in 5" :key="n" :label="`${n} 星`" :value="n" />
       </el-select>
       <div class="filters__actions">
-        <span class="export-opt">含答案 <el-switch v-model="showAnswer" /></span>
-        <span class="export-opt">答题留白 <el-switch v-model="showAnswerArea" /></span>
-        <el-input-number
-          v-if="showAnswerArea"
-          v-model="answerAreaHeight"
-          :min="20"
-          :max="500"
-          :step="20"
-          size="small"
-          style="width: 100px"
-        />
-        <el-tooltip content="打印时请在「更多设置」中取消勾选「页眉和页脚」" placement="top">
-          <el-button type="primary" :icon="Download" @click="doExport">导出 PDF</el-button>
-        </el-tooltip>
+        <el-button type="primary" :icon="Download" @click="exportVisible = true">导出 PDF</el-button>
       </div>
     </div>
 
-    <div class="sub-filters" :class="{ dragging: dragId !== null }">
-      <span class="sub-filters__label">二级知识点</span>
-      <span
-        class="sub-chip"
-        :class="{ active: subTag === '' }"
-        @click="selectSubTag('')"
-      >全部</span>
-      <span
-        v-for="s in subTags"
-        :key="s.name"
-        class="sub-chip"
-        :class="{ active: subTag === s.name }"
-        @click="selectSubTag(s.name)"
-        @dragover.prevent
-        @drop.prevent="onDropTo(s.name)"
-      >
-        {{ s.name }}（{{ s.total }}）
-        <span
-          class="sub-chip__edit"
-          title="编辑该二级知识点（重命名 / 合并 / 删除）"
-          @click.stop="openSubEdit(s)"
-        >
-          <EditPen />
-        </span>
-      </span>
-      <span
-        class="sub-chip sub-chip--empty"
-        :class="{ active: subTag === '__empty__' }"
-        @click="selectSubTag('__empty__')"
-        @dragover.prevent
-        @drop.prevent="onDropTo(null)"
-      >未分类</span>
-      <span v-if="dragId !== null" class="sub-filters__drag-tip">
-        松开鼠标即可将题目归入该二级知识点
-      </span>
-      <span v-else-if="!subTags.length" class="sub-filters__drag-tip">
-        暂无二级知识点——可直接在题目行「二级知识点」下拉框输入名称新建
-      </span>
-    </div>
-
-    <el-table :data="list" border stripe v-loading="loading">
-      <el-table-column label="归类" width="64" align="center">
-        <template #default="{ row }">
-          <span
-            class="drag-handle"
-            draggable="true"
-            :title="subTags.length ? '按住拖拽到上方「二级知识点」处归类' : '可直接编辑下方下拉框归类'"
-            @dragstart="onDragStart($event, row)"
-            @dragend="onDragEnd"
-          >
-            <Rank />
+    <div class="klayout">
+      <!-- 左栏：二级知识点列表。名称左对齐、题量右对齐；可点击筛选、拖放归类 -->
+      <aside class="kside" :class="{ dragging: dragId !== null }">
+        <div class="kside__head">
+          <span>二级知识点</span>
+          <span v-if="dragId !== null" class="kside__tip">松手即归入</span>
+          <span v-else-if="subTag" class="kside__tip is-link" @click="selectSubTag('')">
+            清除筛选
           </span>
-        </template>
-      </el-table-column>
-      <el-table-column label="题干" min-width="240">
-        <template #default="{ row }">
-          <RichContent class="q-preview" :html="row.title || ''" />
-        </template>
-      </el-table-column>
-      <el-table-column label="题型" width="100">
-        <template #default="{ row }">{{ typeLabel(row.type) }}</template>
-      </el-table-column>
-      <el-table-column prop="difficulty" label="难度" width="80" />
-      <el-table-column label="二级知识点" width="190">
-        <template #default="{ row }">
-          <el-select
-            :model-value="row.knowledgeSubTag || ''"
-            size="small"
-            filterable
-            allow-create
-            default-first-option
-            clearable
-            placeholder="未分类"
-            @change="(v: any) => onSubTagEdit(row, v)"
-          >
-            <el-option v-for="s in subTags" :key="s.name" :label="s.name" :value="s.name" />
-          </el-select>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="180">
-        <template #default="{ row }">
-          <el-button size="small" :icon="Edit" @click="openEdit(row)">编辑</el-button>
-          <el-button size="small" type="danger" :icon="Delete" @click="remove(row)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+        </div>
 
-    <div v-if="total > pageSize" class="pager">
-      <el-pagination
-        v-model:current-page="page"
-        :page-size="pageSize"
-        :total="total"
-        layout="prev, pager, next, total"
-        background
-        @current-change="load"
-      />
+        <ul class="ksubs">
+          <li class="ksubs__item" :class="{ 'is-active': subTag === '' }" @click="selectSubTag('')">
+            <span class="ksubs__name">全部</span>
+            <span class="ksubs__count">{{ allCount }}</span>
+          </li>
+          <li
+            v-for="s in subTags"
+            :key="s.name"
+            class="ksubs__item"
+            :class="{ 'is-active': subTag === s.name }"
+            :title="`筛选「${s.name}」`"
+            @click="selectSubTag(s.name)"
+            @dragover.prevent
+            @drop.prevent="onDropTo(s.name)"
+          >
+            <span class="ksubs__name">{{ s.name }}</span>
+            <span class="ksubs__count">{{ s.total }}</span>
+            <span
+              class="ksubs__edit"
+              title="编辑该二级知识点（重命名 / 合并 / 删除）"
+              @click.stop="openSubEdit(s)"
+            >
+              <EditPen />
+            </span>
+          </li>
+          <li
+            class="ksubs__item is-dashed"
+            :class="{ 'is-active': subTag === '__empty__' }"
+            title="筛选未归类的题目"
+            @click="selectSubTag('__empty__')"
+            @dragover.prevent
+            @drop.prevent="onDropTo(null)"
+          >
+            <span class="ksubs__name">未分类</span>
+            <span class="ksubs__count">{{ emptyCount }}</span>
+          </li>
+        </ul>
+
+        <p v-if="!subTags.length" class="kside__hint">
+          还没有二级知识点——在题目卡片右上角的下拉框里直接输入名称即可新建。
+        </p>
+      </aside>
+
+      <!-- 右栏：题目卡片列表，题干完整、选项齐全 -->
+      <div v-loading="loading" class="kmain">
+        <el-empty v-if="!loading && !list.length" description="这里还没有题目" />
+
+        <div class="klist">
+          <QuestionCard
+            v-for="(q, idx) in list"
+            :key="q.id"
+            :question="q"
+            :no="(page - 1) * pageSize + idx + 1"
+            :show-tags="false"
+          >
+            <template #handle>
+              <span
+                class="drag-handle"
+                draggable="true"
+                :title="subTags.length ? '按住拖拽到左侧二级知识点上归类' : '用右侧下拉框归类'"
+                @dragstart="onDragStart($event, q)"
+                @dragend="onDragEnd"
+              >
+                <Rank />
+              </span>
+            </template>
+            <template #tools>
+              <el-select
+                class="sub-pick"
+                :model-value="q.knowledgeSubTag || ''"
+                size="small"
+                filterable
+                allow-create
+                default-first-option
+                clearable
+                placeholder="未分类"
+                @change="(v: any) => onSubTagEdit(q, v)"
+              >
+                <el-option v-for="s in subTags" :key="s.name" :label="s.name" :value="s.name" />
+              </el-select>
+              <el-button size="small" :icon="Edit" @click="openEdit(q)">编辑</el-button>
+              <el-button size="small" type="danger" :icon="Delete" @click="remove(q)">删除</el-button>
+            </template>
+          </QuestionCard>
+        </div>
+
+        <div v-if="total > pageSize" class="pager">
+          <el-pagination
+            v-model:current-page="page"
+            :page-size="pageSize"
+            :total="total"
+            layout="prev, pager, next, total"
+            background
+            @current-change="load"
+          />
+        </div>
+      </div>
     </div>
   </el-card>
 
@@ -157,8 +153,9 @@
     :siblings="subTags"
     @saved="onSubTagSaved"
   />
-</template>
 
+  <QuestionExportDialog v-model="exportVisible" :scope="exportScope" :scope-label="exportLabel" />
+</template>
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { ArrowLeft, Download, Edit, Delete, Rank, EditPen } from '@element-plus/icons-vue'
@@ -171,12 +168,12 @@ import {
   deleteQuestion,
   renameQuestionTag
 } from '../../api/question'
+import type { QuestionQuery } from '../../api/question'
 import QuestionFormDialog from '../../components/QuestionFormDialog.vue'
 import SubTagEditDialog from '../../components/SubTagEditDialog.vue'
-import RichContent from '../../components/RichContent.vue'
+import QuestionCard from '../../components/QuestionCard.vue'
+import QuestionExportDialog from '../../components/QuestionExportDialog.vue'
 import type { Question } from '../../types'
-import { printHtml, PAPER_FONT } from '../../utils/printHtml'
-import { questionTypeLabel as typeLabel, escapeHtml } from '../../utils/format'
 
 const route = useRoute()
 const router = useRouter()
@@ -194,13 +191,27 @@ const total = ref(0)
 const difficulty = ref<number>()
 const editVisible = ref(false)
 const editing = ref<any>(null)
-const showAnswer = ref(false)
-const showAnswerArea = ref(false)
-const answerAreaHeight = ref(100)
 
 // —— 二级知识点筛选 ——
 const subTag = ref('')
 const subTags = ref<{ name: string; total: number }[]>([])
+// 未归类题量：subtags 接口只返回有值的二级，未分类要单独取一次
+const emptyCount = ref(0)
+// 「全部」= 各二级之和 + 未分类，正好覆盖该一级知识点下的所有题
+const allCount = computed(() => subTags.value.reduce((n, s) => n + s.total, 0) + emptyCount.value)
+
+// —— 导出 PDF（当前一级 + 当前二级筛选）——
+const exportVisible = ref(false)
+const exportScope = computed(() => {
+  const p: QuestionQuery = { knowledgeTag: tag.value }
+  if (subTag.value === '__empty__') p.knowledgeSubTag = '__empty__'
+  else if (subTag.value) p.knowledgeSubTag = subTag.value
+  return p
+})
+const exportLabel = computed(() => {
+  if (!subTag.value) return tagLabel.value
+  return `${tagLabel.value} › ${subTag.value === '__empty__' ? '未分类' : subTag.value}`
+})
 
 // —— 二级知识点编辑（重命名 / 合并 / 删除 / 换题库）——
 const subEditVisible = ref(false)
@@ -222,12 +233,23 @@ const onSubTagSaved = async (payload?: { name?: string }) => {
   }
 }
 
-// 加载当前一级知识点下的二级知识点（带题量）
+// 加载当前一级知识点下的二级知识点（带题量）与未分类题量
 const loadSubTags = async () => {
   try {
     subTags.value = await getQuestionSubTags(tag.value)
   } catch {
     subTags.value = []
+  }
+  try {
+    const res = await getQuestions({
+      knowledgeTag: tag.value,
+      knowledgeSubTag: '__empty__',
+      page: 1,
+      pageSize: 1
+    })
+    emptyCount.value = res.total
+  } catch {
+    emptyCount.value = 0
   }
 }
 
@@ -286,68 +308,7 @@ const onSubTagEdit = async (row: any, value: any) => {
   }
 }
 
-// 生成知识点题目集 HTML（打印用）
-const buildQuestionsHtml = (questions: any[], withAnswer: boolean) => {
-  const fs = 16
-  const subLabel = subTag.value === '__empty__' ? '未分类' : subTag.value
-  const title = subLabel
-    ? `${tagLabel.value} › ${subLabel} · 题目集`
-    : `${tagLabel.value} · 题目集`
-  const renderOpts = (q: any) =>
-    q.options && Array.isArray(q.options)
-      ? `<div style="margin:6px 0 0 22px;">${q.options
-          .map(
-            (o: any, j: number) =>
-              `<div style="margin:2px 0;">${String.fromCharCode(65 + j)}. ${escapeHtml(
-                typeof o === 'string' ? o : JSON.stringify(o)
-              )}</div>`
-          )
-          .join('')}</div>`
-      : ''
-  const body = questions
-    .map(
-      (q, i) => `
-      <div style="margin-bottom:18px;page-break-inside:avoid;">
-        <div style="margin-bottom:4px;">
-          <span style="font-weight:700;">${i + 1}.</span>
-          <span style="color:#999;font-size:${fs - 2}px;margin-left:6px;">【${escapeHtml(typeLabel(q.type))}】</span>
-          ${q.difficulty ? `<span style="color:#999;font-size:${fs - 2}px;margin-left:6px;">难度 ${q.difficulty} 星</span>` : ''}
-        </div>
-        <div>${q.title || ''}</div>
-        ${renderOpts(q)}
-        ${q.body ? `<div style="margin-top:4px;">${q.body}</div>` : ''}
-        ${showAnswerArea.value ? `<div style="height:${answerAreaHeight.value}px;"></div>` : ''}
-        ${withAnswer && q.answer ? `<div style="color:#c0392b;margin-top:6px;"><b>【答案与解析】</b>${q.answer}</div>` : ''}
-      </div>`
-    )
-    .join('')
-  return `<div style="font-family:${PAPER_FONT};font-size:${fs}px;line-height:1.8;color:#222;padding:28px;max-width:800px;margin:0 auto;background:#fff;">
-    <div style="text-align:center;border-bottom:2px solid #333;padding-bottom:12px;margin-bottom:18px;">
-      <div style="font-size:${fs + 6}px;font-weight:700;">${escapeHtml(title)}</div>
-      <div style="font-size:${fs - 2}px;color:#555;margin-top:6px;">共 ${questions.length} 题${withAnswer ? '（含答案）' : ''}</div>
-    </div>
-    ${body}
-  </div>`
-}
-
-// 导出当前筛选下的全部题目为 PDF（打印方式）
-const doExport = async () => {
-  const params: any = { knowledgeTag: tag.value }
-  if (subTag.value === '__empty__') params.knowledgeSubTag = '__empty__'
-  else if (subTag.value) params.knowledgeSubTag = subTag.value
-  const all = await getQuestions(params)
-  if (!all.length) {
-    ElMessage.warning('当前筛选下没有题目')
-    return
-  }
-  const subLabel = subTag.value === '__empty__' ? '未分类' : subTag.value
-  const okFlag = printHtml(
-    `${subLabel ? tagLabel.value + ' › ' + subLabel : tagLabel.value} · 题目集`,
-    buildQuestionsHtml(all, showAnswer.value)
-  )
-  if (!okFlag) ElMessage.warning('浏览器拦截了弹出窗口，请允许本站弹窗后再试')
-}
-
+// 导出交给 QuestionExportDialog 统一处理（含答案 / 答题留白 / 按知识点分组都在对话框里选）
 const load = async () => {
   loading.value = true
   try {
@@ -446,16 +407,17 @@ watch(
 
 <style scoped>
 .toolbar {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   display: flex;
   align-items: center;
   gap: 12px;
 }
 .title {
   font-family: var(--font-display);
-  font-size: 18px;
+  font-size: 19px;
   font-weight: 700;
   color: var(--ink);
+  letter-spacing: 0.04em;
 }
 .count {
   color: var(--ink-soft);
@@ -468,122 +430,197 @@ watch(
   padding: 4px;
   border-radius: 6px;
   transition:
-    color 0.15s ease,
-    background-color 0.15s ease;
+    color var(--dur) var(--ease),
+    background-color var(--dur) var(--ease);
 }
 .toolbar-rename:hover {
   color: var(--moss-deep);
   background: var(--moss-soft);
 }
-/* 题干预览：渲染富文本与 LaTeX 公式，最多两行，超出隐藏（完整内容见编辑弹窗） */
-.q-preview {
-  font-size: 13px;
-  line-height: 1.6;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.q-preview :deep(.katex-display) {
-  overflow-x: auto;
-  overflow-y: hidden;
-}
+
 .filters {
   margin-bottom: 16px;
   display: flex;
   align-items: center;
   gap: 12px;
 }
-.sub-filters {
-  margin-bottom: 16px;
+.filters__actions {
+  margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  gap: 14px;
 }
-.sub-filters__label {
-  font-size: 13px;
-  color: var(--ink-soft);
+
+/* —— 主体：左栏二级知识点 + 右栏题目卡片 —— */
+.klayout {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.kside {
   flex-shrink: 0;
+  width: 218px;
+  position: sticky;
+  top: 0;
+  max-height: calc(100vh - 240px);
+  overflow-y: auto;
+  padding: 12px 10px;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  background-color: transparent;
+  background-image: linear-gradient(180deg, var(--glass-bg-strong), var(--glass-bg));
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow-soft);
 }
-.sub-chip {
-  display: inline-flex;
+.kside__head {
+  display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 13px;
-  line-height: 1;
+  gap: 6px;
+  padding: 2px 8px 8px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--hair);
+  font-size: 12px;
+  letter-spacing: 0.14em;
   color: var(--ink-soft);
-  background: var(--paper-deep);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 6px 12px;
-  cursor: pointer;
-  user-select: none;
-  transition:
-    background-color 0.15s ease,
-    color 0.15s ease,
-    border-color 0.15s ease,
-    transform 0.15s ease,
-    box-shadow 0.15s ease;
 }
-.sub-chip:hover {
-  border-color: var(--moss);
+.kside__tip {
+  margin-left: auto;
+  font-size: 11px;
+  letter-spacing: 0;
   color: var(--moss-deep);
 }
-.sub-chip.active {
-  background: var(--moss);
-  border-color: var(--moss);
-  color: var(--on-accent);
+.kside__tip.is-link {
+  cursor: pointer;
+}
+.kside__tip.is-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.kside__hint {
+  margin: 10px 8px 2px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--ink-soft);
+}
+
+/* 二级知识点列表：名称左对齐成一列、题量右对齐成一列 */
+.ksubs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ksubs__item {
+  display: flex;
+  align-items: center;
+  /*
+   * 这里刻意不用 gap：编辑图标即使宽度为 0，gap 依然占位，
+   * 会让「有编辑图标的行」比「没有的」（全部 / 未分类）多出一个间距，题量列就对不齐了。
+   * 名称的右间距改用 margin 表达。
+   */
+  gap: 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color var(--dur) var(--ease);
+}
+.ksubs__item:hover {
+  background: rgba(255, 255, 255, 0.62);
+}
+.ksubs__item.is-active {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(246, 246, 243, 0.7));
+  box-shadow: var(--lit-top), var(--lit-deep);
+}
+.ksubs__name {
+  flex: 1;
+  min-width: 0;
+  margin-right: 8px;
+  font-size: 13px;
+  color: var(--ink-regular);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ksubs__item.is-active .ksubs__name {
+  color: var(--ink);
   font-weight: 600;
 }
-/* 二级知识点编辑入口：平时淡隐，鼠标悬停到芯片上才显现，避免干扰筛选点击 */
-.sub-chip__edit {
-  display: inline-flex;
-  align-items: center;
+.ksubs__count {
+  flex-shrink: 0;
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
-  opacity: 0;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: opacity 0.15s ease;
+  color: var(--ink-soft);
 }
-.sub-chip:hover .sub-chip__edit {
-  opacity: 0.7;
-}
-.sub-chip__edit:hover {
-  opacity: 1;
-}
-.sub-chip--empty {
-  border-style: dashed;
-}
-/* 拖拽中：所有芯片显示为可投放目标，悬停高亮 */
-.sub-filters.dragging .sub-chip {
-  border-style: dashed;
-  border-color: var(--moss);
-}
-.sub-filters.dragging .sub-chip:hover {
-  background: var(--moss);
-  border-style: solid;
-  color: var(--on-accent);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(110, 78, 16, 0.34);
-}
-.sub-filters__drag-tip {
-  font-size: 12px;
+.ksubs__item.is-active .ksubs__count {
   color: var(--moss-deep);
 }
-/* 拖拽手柄 */
+/* 「未分类」用一条细线隔开，与真实二级知识点区分 */
+.ksubs__item.is-dashed {
+  margin-top: 6px;
+  border-top: 1px solid var(--hair);
+  border-radius: 0 0 8px 8px;
+}
+/* 编辑入口平时不占宽度，悬停该行才展开 */
+.ksubs__edit {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    width var(--dur) var(--ease),
+    opacity var(--dur) var(--ease);
+}
+.ksubs__item:hover .ksubs__edit {
+  width: 15px;
+  opacity: 0.75;
+}
+.ksubs__edit:hover {
+  opacity: 1;
+}
+/* 拖拽中：左侧每一项都是可投放目标 */
+.kside.dragging .ksubs__item {
+  outline: 1px dashed var(--moss);
+  outline-offset: -2px;
+}
+.kside.dragging .ksubs__item:hover {
+  background: var(--moss);
+  outline-style: solid;
+}
+.kside.dragging .ksubs__item:hover .ksubs__name,
+.kside.dragging .ksubs__item:hover .ksubs__count {
+  color: var(--on-accent);
+}
+
+.kmain {
+  flex: 1;
+  min-width: 0;
+}
+.klist {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 200px;
+}
+
+/* 卡片头上的拖拽手柄 */
 .drag-handle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
   cursor: grab;
   color: var(--ink-soft);
   font-size: 16px;
-  padding: 4px 6px;
+  padding: 2px 4px;
   border-radius: 6px;
   transition:
-    color 0.15s ease,
-    background-color 0.15s ease;
+    color var(--dur) var(--ease),
+    background-color var(--dur) var(--ease);
 }
 .drag-handle:hover {
   color: var(--moss-deep);
@@ -592,22 +629,34 @@ watch(
 .drag-handle:active {
   cursor: grabbing;
 }
-.filters__actions {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.export-opt {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--ink-regular);
-  font-size: 13px;
+.sub-pick {
+  width: 152px;
 }
 .pager {
   margin-top: 16px;
   display: flex;
   justify-content: center;
+}
+
+@media (max-width: 1000px) {
+  .klayout {
+    flex-direction: column;
+  }
+  .kside {
+    width: 100%;
+    position: static;
+    max-height: none;
+  }
+  /* 窄屏排成两列，省一半高度 */
+  .ksubs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px 8px;
+  }
+}
+@media (max-width: 720px) {
+  .sub-pick {
+    width: 120px;
+  }
 }
 </style>

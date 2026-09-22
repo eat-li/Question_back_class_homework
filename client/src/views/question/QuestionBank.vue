@@ -10,6 +10,7 @@
       />
       <el-button type="primary" :icon="Search" @click="load">查询</el-button>
       <el-button type="primary" :icon="Plus" @click="openCreate">新增题目</el-button>
+      <el-button :icon="Download" @click="exportVisible = true">导出全部 PDF</el-button>
     </div>
 
     <div v-loading="loading" class="kb-grid">
@@ -31,23 +32,25 @@
           <span v-if="g.fill">填空 {{ g.fill }}</span>
           <span v-if="g.solve">解答 {{ g.solve }}</span>
         </div>
-        <div v-if="g.subTags && g.subTags.length" class="kb-card__subs">
-          <span
+        <ul v-if="g.subTags && g.subTags.length" class="kb-subs">
+          <li
             v-for="s in sortedSubs(g)"
             :key="s.name"
-            class="kb-card__sub"
+            class="kb-subs__item"
+            :title="`查看「${s.name}」下的 ${s.total} 道题`"
             @click.stop="goSubKnowledge(g.tag, s.name)"
           >
-            {{ s.name }} {{ s.total }}
+            <span class="kb-subs__name">{{ s.name }}</span>
+            <span class="kb-subs__count">{{ s.total }}</span>
             <span
-              class="kb-card__sub-edit"
+              class="kb-subs__edit"
               title="编辑该二级知识点（重命名 / 合并 / 删除）"
               @click.stop="openSubEdit(g, s)"
             >
               <EditPen />
             </span>
-          </span>
-        </div>
+          </li>
+        </ul>
       </div>
     </div>
     <el-empty v-if="!loading && !groups.length" description="暂无知识点" />
@@ -63,16 +66,25 @@
     :siblings="subEditTarget.siblings"
     @saved="load"
   />
+
+  <!-- 导出整个题库为 PDF（不折叠、不受卡片上的搜索词影响，导出的就是全部题目） -->
+  <QuestionExportDialog
+    v-model="exportVisible"
+    :scope="{}"
+    scope-label="题库全部题目"
+    allow-group
+  />
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { Search, Plus, EditPen } from '@element-plus/icons-vue'
+import { Search, Plus, EditPen, Download } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getQuestionStats, renameQuestionTag } from '../../api/question'
 import QuestionFormDialog from '../../components/QuestionFormDialog.vue'
 import SubTagEditDialog from '../../components/SubTagEditDialog.vue'
+import QuestionExportDialog from '../../components/QuestionExportDialog.vue'
 import type { QuestionStats } from '../../types'
 
 const router = useRouter()
@@ -80,6 +92,7 @@ const loading = ref(false)
 const keyword = ref('')
 const dialogVisible = ref(false)
 const groups = ref<QuestionStats[]>([])
+const exportVisible = ref(false)
 
 // 二级知识点全部平铺展示、不做折叠，卡片按内容自然撑开；
 // 只按题量降序排列，让常用的排在前面，数量多时更好扫读。
@@ -237,43 +250,73 @@ onMounted(load)
   font-size: 12px;
   color: var(--ink-soft);
 }
-.kb-card__subs {
+/* 二级知识点列表：每行一个，名称左对齐成一列、题量右对齐成一列，
+   比胶囊换行更好扫读——胶囊每个宽度随名字长短变化，换行后左右都参差不齐。 */
+.kb-subs {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 6px 0 0;
+  border-top: 1px solid var(--hair);
+}
+.kb-subs__item {
   display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px dashed var(--line);
-}
-.kb-card__sub {
-  font-size: 12px;
-  line-height: 1;
-  color: var(--moss-deep);
-  background: var(--moss-soft);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 4px 9px;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  margin: 0 -6px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color var(--dur) var(--ease);
 }
-.kb-card__sub:hover {
-  background: var(--moss);
-  color: var(--on-accent);
-  border-color: var(--moss);
+.kb-subs__item + .kb-subs__item {
+  border-top: 1px solid var(--hair);
 }
-/* 二级知识点编辑入口：平时淡隐，悬停标签时显现 */
-.kb-card__sub-edit {
+.kb-subs__item:hover {
+  background: rgba(255, 255, 255, 0.62);
+}
+.kb-subs__name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--ink-regular);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color var(--dur) var(--ease);
+}
+.kb-subs__item:hover .kb-subs__name {
+  color: var(--ink);
+}
+.kb-subs__count {
+  flex-shrink: 0;
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--ink-soft);
+  transition: color var(--dur) var(--ease);
+}
+.kb-subs__item:hover .kb-subs__count {
+  color: var(--moss-deep);
+}
+/* 编辑入口：平时宽度为 0 不占位，悬停该行才展开——否则每行都要为一个看不见的图标让出十几个像素 */
+.kb-subs__edit {
   display: inline-flex;
   align-items: center;
-  font-size: 11px;
+  flex-shrink: 0;
+  width: 0;
+  overflow: hidden;
   opacity: 0;
+  font-size: 12px;
   cursor: pointer;
-  transition: opacity 0.15s ease;
+  transition:
+    width var(--dur) var(--ease),
+    opacity var(--dur) var(--ease);
 }
-.kb-card__sub:hover .kb-card__sub-edit {
+.kb-subs__item:hover .kb-subs__edit {
+  width: 15px;
   opacity: 0.75;
 }
-.kb-card__sub-edit:hover {
+.kb-subs__edit:hover {
   opacity: 1;
 }
 </style>
