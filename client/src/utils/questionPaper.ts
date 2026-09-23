@@ -35,6 +35,30 @@ const renderOptions = (q: any) => {
     .join('')}</div>`
 }
 
+// 一级知识点大标题：作为「章」，字号最大 + 粗底线
+const renderGroupHeading = (name: string, count: number, fs: number) =>
+  `<div style="margin:26px 0 10px;padding-bottom:6px;border-bottom:2px solid #333;` +
+  `font-size:${fs + 3}px;font-weight:700;color:#222;page-break-after:avoid;">${escapeHtml(name)}` +
+  `<span style="font-weight:400;color:#777;font-size:${fs - 3}px;margin-left:10px;">${count} 题</span></div>`
+
+// 二级知识点小标题：作为「节」，左侧琥珀金竖条 + 浅琥珀底 + 琥珀色字。
+// 彩色打印时一眼能看出分节；黑白打印时竖条与加粗也仍能把层级区分开。
+const renderSubHeading = (name: string, count: number, fs: number) =>
+  `<div style="margin:16px 0 8px;padding:5px 12px;border-left:4px solid #96681a;background:#f7f2e7;` +
+  `font-size:${fs + 1}px;font-weight:700;color:#7d5511;page-break-after:avoid;">${escapeHtml(name)}` +
+  `<span style="font-weight:400;color:#8a7a5c;font-size:${fs - 3}px;margin-left:8px;">${count} 题</span></div>`
+
+// 按二级知识点分桶：题量降序（与题库侧栏顺序一致）
+const bucketBySubTag = (list: any[]) => {
+  const map = new Map<string, any[]>()
+  for (const q of list) {
+    const key = q.knowledgeSubTag || UNCLASSIFIED
+    if (!map.has(key)) map.set(key, [])
+    map.get(key)!.push(q)
+  }
+  return [...map.entries()].sort((a, b) => b[1].length - a[1].length)
+}
+
 export const buildQuestionPaperHtml = (opts: QuestionPaperOptions): string => {
   const {
     title,
@@ -61,27 +85,41 @@ export const buildQuestionPaperHtml = (opts: QuestionPaperOptions): string => {
       </div>`
 
   let body = ''
+  let no = 0
+
+  /*
+   * 一组题先按二级知识点分节。
+   * 只有该组确实跨了多个二级时才加小标题——整组都是同一个二级时，
+   * 小标题只是把同一件事说了两遍，属于噪音。
+   * 题号跨小节连续编号，与抬头「共 N 题」对得上。
+   */
+  const renderGroupBody = (list: any[]) => {
+    const buckets = bucketBySubTag(list)
+    const showSubHeading = buckets.length > 1
+    return buckets
+      .map(
+        ([name, items]) =>
+          (showSubHeading ? renderSubHeading(name, items.length, fs) : '') +
+          items.map((q) => renderQuestion(q, ++no)).join('')
+      )
+      .join('')
+  }
+
   if (groupByKnowledge) {
-    // 分组：一级知识点按题量降序（与题库卡片顺序一致），组内保持传入顺序
+    // 一级知识点按题量降序（与题库卡片顺序一致），组内再按二级分节
     const map = new Map<string, any[]>()
     for (const q of questions) {
       const key = q.knowledgeTag || UNCLASSIFIED
       if (!map.has(key)) map.set(key, [])
       map.get(key)!.push(q)
     }
-    let no = 0
     body = [...map.entries()]
       .sort((a, b) => b[1].length - a[1].length)
-      .map(([name, list]) => {
-        const head =
-          `<div style="margin:22px 0 10px;padding-bottom:6px;border-bottom:1px solid #bbb;` +
-          `font-size:${fs + 1}px;font-weight:700;">${escapeHtml(name)}` +
-          `<span style="font-weight:400;color:#777;font-size:${fs - 3}px;margin-left:8px;">${list.length} 题</span></div>`
-        return head + list.map((q) => renderQuestion(q, ++no)).join('')
-      })
+      .map(([name, list]) => renderGroupHeading(name, list.length, fs) + renderGroupBody(list))
       .join('')
   } else {
-    body = questions.map((q, i) => renderQuestion(q, i + 1)).join('')
+    // 不按一级分组时（如知识点页导出），二级小标题同样能让题目按类别分开
+    body = renderGroupBody(questions)
   }
 
   return `<div style="font-family:${PAPER_FONT};font-size:${fs}px;line-height:1.8;color:#222;padding:28px;max-width:800px;margin:0 auto;background:#fff;">
