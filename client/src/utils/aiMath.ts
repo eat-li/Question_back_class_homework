@@ -44,8 +44,10 @@ export function normalizeAiMathHtml(html: string): AiMathResult {
   let out = html
 
   // 1) \(...\) / \[...\] → $...$ / $$...$$（模型可能不听指令用这种写法）
+  //    内层用 [\s\S]*? 而非 [^()]*?：公式里带括号极常见（如 \((x-2)(x+1)=0\)），
+  //    排除括号会让这类公式整段匹配不上，原样残留在正文里渲染不出公式。
   out = out.replace(/\\\[([\s\S]*?)\\\]/g, (_, inner: string) => `$$${inner.trim()}$$`)
-  out = out.replace(/\\\(([^()]*?)\\\)/g, (_, inner: string) => `$${inner.trim()}$`)
+  out = out.replace(/\\\(([\s\S]*?)\\\)/g, (_, inner: string) => `$${inner.trim()}$`)
 
   // 2) 处理 $$...$$ 块（可跨 <br>）：去多余 $、替换 Unicode、压缩空白
   out = out.replace(/\$\$([\s\S]*?)\$\$/g, (raw, inner: string) => {

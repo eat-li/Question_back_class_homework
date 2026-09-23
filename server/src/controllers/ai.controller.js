@@ -176,9 +176,11 @@ function cleanAiHtml(html) {
     .replace(/^```(?:html|HTML)?\s*/g, '')
     .replace(/```\s*$/g, '')
     .replace(/<\/?(?:html|body|head)[^>]*>/gi, '')
-  // 模型可能用 \(...\) / \[...\] 而非 $...$ / $$...$$，统一转成 KaTeX 约定
+  // 模型可能用 \(...\) / \[...\] 而非 $...$ / $$...$$，统一转成 KaTeX 约定。
+  // 注意内层必须用 [\s\S]*? 而不是 [^()]*?：数学公式里带括号极其常见
+  // （如 \((x-2)(x+1)=0\)），排除括号会导致这类公式整段匹配不上、原样留在正文里。
   out = out.replace(/\\\[([\s\S]*?)\\\]/g, (_, inner) => `$$${inner.trim()}$$`)
-  out = out.replace(/\\\(([^()]*?)\\\)/g, (_, inner) => `$${inner.trim()}$`)
+  out = out.replace(/\\\(([\s\S]*?)\\\)/g, (_, inner) => `$${inner.trim()}$`)
   // 压缩多余空行
   out = out.replace(/\n{3,}/g, '\n\n').trim()
   return out
