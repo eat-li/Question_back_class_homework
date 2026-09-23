@@ -256,99 +256,177 @@
     <div class="sel-hint">
       <template v-if="swapIndex === null">
         直接改左侧<b>题号</b>并回车，即可把该题移到指定位置（其余题目自动让位）；也可拖动 ⠿
-        或用「上移/下移」微调，或点击两题<b>互换位置</b>。点「查看整题」可展开完整题目。
+        或用「上移/下移」微调，或点击两题<b>互换位置</b>。左栏的二级知识点也能拖动，
+        拖一下<b>整段题目</b>一起换位置。点「查看整题」可展开完整题目。
       </template>
       <template v-else>
         已选中第 <b>{{ swapIndex + 1 }}</b> 题 —— 再点另一题交换位置，点自己或点「取消选中」放弃。
         <el-button link type="primary" size="small" @click="swapIndex = null">取消选中</el-button>
       </template>
     </div>
-    <div v-loading="selectedLoading" class="sel-wrap">
-      <el-empty v-if="!selectedLoading && !selectedList.length" description="还没有选择题目" />
-      <TransitionGroup name="sel" tag="div" class="sel-list">
-        <div
-          v-for="(q, i) in selectedList"
-          :key="q.id"
-          :data-id="q.id"
-          class="sel-row"
-          :class="{
-            'is-dragging': dragIndex === i,
-            'is-picked': swapIndex === i,
-            'is-flash': flashId === q.id
-          }"
-        :title="
-          swapIndex === null ? '点击选中该题，再点另一题即可交换顺序' : '点击与选中题目交换位置'
-        "
-        @click="onSelRowClick(i)"
-        @dragover.prevent="onSelDragOver(i)"
-        @drop.prevent="onSelDrop"
-      >
-        <!-- 题号可直接改：输入目标位置后回车，本题就移到那里，其余题目依次让位 -->
-        <input
-          class="sel-no"
-          :class="{ 'is-picked': swapIndex === i }"
-          type="text"
-          inputmode="numeric"
-          :value="i + 1"
-          :title="`当前第 ${i + 1} 题；改成目标题号并回车，可直接移到该位置`"
-          @click.stop
-          @keydown.enter.stop.prevent="onGoto(q.id, $event)"
-          @keydown.esc.stop="onGotoEsc(i, $event)"
-          @blur="onGoto(q.id, $event)"
-        />
-        <span
-          class="sel-handle"
-          draggable="true"
-          title="按住拖动调整顺序"
-          @click.stop
-          @dragstart="onSelDragStart(i)"
-          @dragend="onSelDragEnd"
-          >⠿</span
-        >
-        <div class="sel-main" @click="onQuestionCellClick">
-          <RichContent
-            class="sel-title"
-            :class="{ 'is-full': isSelectedFull(q.id) }"
-            :html="q.title || ''"
-          />
-          <template v-if="isSelectedFull(q.id)">
-            <div v-if="optionTexts(q).length" class="q-cell-options">
-              <div v-for="(opt, oi) in optionTexts(q)" :key="oi" class="q-cell-option">
-                {{ String.fromCharCode(65 + oi) }}. {{ opt }}
-              </div>
-            </div>
-            <RichContent v-if="q.body" class="q-cell-body" :html="q.body" />
-          </template>
-          <div class="sel-tags">
-            <el-tag size="small" type="info">{{ typeLabel(q.type) }}</el-tag>
-            <el-tag size="small" type="warning">{{ '★'.repeat(q.difficulty || 0) || '—' }}</el-tag>
-            <el-tag v-if="q.knowledgeTag" size="small"
-              >{{ q.knowledgeTag }}{{ q.knowledgeSubTag ? ' › ' + q.knowledgeSubTag : '' }}</el-tag
-            >
-          </div>
-        </div>
-        <div class="sel-actions">
-          <el-button size="small" text @click.stop="toggleSelectedFull(q.id)">
-            {{ isSelectedFull(q.id) ? '收起' : '查看整题' }}
-          </el-button>
-          <!-- 这道题还没有解析时，可以直接让 AI 补一份（有解析就不会出现） -->
-          <AiAnswerButton :question="q" @generated="(html: string) => (q.answer = html)" />
-          <el-button size="small" text :disabled="i === 0" @click.stop="moveSelected(i, -1)"
-            >上移</el-button
-          >
+    <div class="sel-body">
+      <!-- 左栏：本次作业涉及的二级知识点。点一下只看该类，再点一下还原 -->
+      <aside v-if="kpList.length > 1" class="sel-kp">
+        <div class="sel-kp__head">
+          <span>二级知识点</span>
           <el-button
+            class="sel-kp__arrange"
             size="small"
             text
-            :disabled="i === selectedList.length - 1"
-            @click.stop="moveSelected(i, 1)"
-            >下移</el-button
+            type="primary"
+            title="把同一二级知识点的题目聚成一段，段的先后按题量降序，段内保持原顺序"
+            @click="arrangeByKp"
           >
-          <el-button size="small" text type="danger" @click.stop="removeSelected(i)"
-            >移除</el-button
-          >
+            按知识点排列
+          </el-button>
         </div>
+        <ul class="sel-kp__list">
+          <li
+            class="sel-kp__item"
+            :class="{ 'is-active': kpFilter === '' }"
+            @click="kpFilter = ''"
+          >
+            <!-- 占位：让「全部」的名称与下面各项左对齐 -->
+            <span class="sel-kp__handle is-ghost" aria-hidden="true">⠿</span>
+            <span class="sel-kp__name">全部</span>
+            <span class="sel-kp__count">{{ selectedList.length }}</span>
+          </li>
+          <li
+            v-for="k in kpList"
+            :key="k.key"
+            class="sel-kp__item"
+            :class="{ 'is-active': kpFilter === k.key, 'is-kp-dragging': kpDragKey === k.key }"
+            :title="`只看「${k.name}」的题目`"
+            @click="kpFilter = kpFilter === k.key ? '' : k.key"
+            @dragover.prevent="onKpDragOver(k.key)"
+            @drop.prevent="onKpDragEnd"
+          >
+            <!-- 拖动即可调整知识点顺序，该知识点下的题目整段跟着移动 -->
+            <span
+              class="sel-kp__handle"
+              :draggable="!kpFiltering"
+              title="按住拖动调整知识点顺序（该知识点下的题目整段跟着移动）"
+              @click.stop
+              @dragstart="onKpDragStart(k.key)"
+              @dragend="onKpDragEnd"
+              >⠿</span
+            >
+            <span class="sel-kp__name">{{ k.name }}</span>
+            <span class="sel-kp__count">{{ k.total }}</span>
+          </li>
+        </ul>
+        <p v-if="kpFiltering" class="sel-kp__hint">
+          筛选中只作查看用。要调整顺序，请先点「全部」。
+        </p>
+      </aside>
+
+      <div v-loading="selectedLoading" class="sel-wrap">
+        <el-empty v-if="!selectedLoading && !selectedList.length" description="还没有选择题目" />
+        <TransitionGroup name="sel" tag="div" class="sel-list">
+          <div
+            v-for="(item, pos) in viewList"
+            :key="item.q.id"
+            :data-id="item.q.id"
+            class="sel-row"
+            :class="{
+              'is-dragging': dragIndex === item.index,
+              'is-picked': swapIndex === item.index,
+              'is-flash': flashId === item.q.id,
+              'is-group-start': viewList.length > 1 && isGroupStart(pos)
+            }"
+            :title="
+              kpFiltering
+                ? '筛选中只作查看用；调整顺序请先切回「全部」'
+                : swapIndex === null
+                  ? '点击选中该题，再点另一题即可交换顺序'
+                  : '点击与选中题目交换位置'
+            "
+            @click="onSelRowClick(item.index)"
+            @dragover.prevent="onSelDragOver(item.index)"
+            @drop.prevent="onSelDrop"
+          >
+            <!-- 题号可直接改：输入目标位置后回车，本题就移到那里，其余题目依次让位 -->
+            <input
+              class="sel-no"
+              :class="{ 'is-picked': swapIndex === item.index }"
+              type="text"
+              inputmode="numeric"
+              :value="item.index + 1"
+              :readonly="kpFiltering"
+              :title="
+                kpFiltering
+                  ? '筛选中不能改题号'
+                  : `当前第 ${item.index + 1} 题；改成目标题号并回车，可直接移到该位置`
+              "
+              @click.stop
+              @keydown.enter.stop.prevent="onGoto(item.q.id, $event)"
+              @keydown.esc.stop="onGotoEsc(item.index, $event)"
+              @blur="onGoto(item.q.id, $event)"
+            />
+            <span
+              class="sel-handle"
+              :draggable="!kpFiltering"
+              title="按住拖动调整顺序"
+              @click.stop
+              @dragstart="onSelDragStart(item.index)"
+              @dragend="onSelDragEnd"
+              >⠿</span
+            >
+            <div class="sel-main" @click="onQuestionCellClick">
+              <RichContent
+                class="sel-title"
+                :class="{ 'is-full': isSelectedFull(item.q.id) }"
+                :html="item.q.title || ''"
+              />
+              <template v-if="isSelectedFull(item.q.id)">
+                <div v-if="optionTexts(item.q).length" class="q-cell-options">
+                  <div v-for="(opt, oi) in optionTexts(item.q)" :key="oi" class="q-cell-option">
+                    {{ String.fromCharCode(65 + oi) }}. {{ opt }}
+                  </div>
+                </div>
+                <RichContent v-if="item.q.body" class="q-cell-body" :html="item.q.body" />
+              </template>
+              <div class="sel-tags">
+                <el-tag size="small" type="info">{{ typeLabel(item.q.type) }}</el-tag>
+                <el-tag size="small" type="warning">{{
+                  '★'.repeat(item.q.difficulty || 0) || '—'
+                }}</el-tag>
+                <el-tag v-if="item.q.knowledgeTag" size="small"
+                  >{{ item.q.knowledgeTag
+                  }}{{ item.q.knowledgeSubTag ? ' › ' + item.q.knowledgeSubTag : '' }}</el-tag
+                >
+              </div>
+            </div>
+            <div class="sel-actions">
+              <el-button size="small" text @click.stop="toggleSelectedFull(item.q.id)">
+                {{ isSelectedFull(item.q.id) ? '收起' : '查看整题' }}
+              </el-button>
+              <!-- 这道题还没有解析时，可以直接让 AI 补一份（有解析就不会出现） -->
+              <AiAnswerButton
+                :question="item.q"
+                @generated="(html: string) => (item.q.answer = html)"
+              />
+              <el-button
+                size="small"
+                text
+                :disabled="kpFiltering || item.index === 0"
+                @click.stop="moveSelected(item.index, -1)"
+                >上移</el-button
+              >
+              <el-button
+                size="small"
+                text
+                :disabled="kpFiltering || item.index === selectedList.length - 1"
+                @click.stop="moveSelected(item.index, 1)"
+                >下移</el-button
+              >
+              <el-button size="small" text type="danger" @click.stop="removeSelected(item.index)"
+                >移除</el-button
+              >
+            </div>
+          </div>
+        </TransitionGroup>
       </div>
-      </TransitionGroup>
     </div>
     <template #footer>
       <el-button @click="selectedVisible = false">取消</el-button>
@@ -815,12 +893,116 @@ const dragIndex = ref<number | null>(null)
 const swapIndex = ref<number | null>(null) // 点选互换：已选中待交换的题序号
 const selectedFullIds = ref<number[]>([]) // 已展开查看完整题目的题目 id
 
+// —— 二级知识点：筛选查看 + 按知识点排列 ——
+// 键取「一级|二级」：不同一级下的同名二级不该被并成一组
+const kpKeyOf = (q: any) => `${q?.knowledgeTag || '未分类'}|${q?.knowledgeSubTag || '未分类'}`
+const kpNameOf = (q: any) => q?.knowledgeSubTag || '未分类'
+
+const kpFilter = ref('')
+const kpFiltering = computed(() => kpFilter.value !== '')
+
+// 左栏列表。顺序取「题目列表里各知识点出现的先后」，不按题量排——
+// 因为左栏同时是整段顺序的操作面板，按题量排会让拖动后左栏纹丝不动，
+// 也会与右侧题目列表的实际段落顺序自相矛盾。
+// 本次作业跨了多个一级知识点时，标签里带上归属，否则二级名就够唯一。
+const kpList = computed(() => {
+  const multiTag = new Set(selectedList.value.map((q) => q?.knowledgeTag || '未分类')).size > 1
+  const map = new Map<string, { key: string; name: string; total: number }>()
+  for (const q of selectedList.value) {
+    const key = kpKeyOf(q)
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        name: multiTag ? `${q?.knowledgeTag || '未分类'} › ${kpNameOf(q)}` : kpNameOf(q),
+        total: 0
+      })
+    }
+    map.get(key)!.total++
+  }
+  return [...map.values()]
+})
+
+// 视图列表带原始序号：筛选中也要显示该题在整份作业里的真实题号
+const viewList = computed(() => {
+  const withIndex = selectedList.value.map((q, index) => ({ q, index }))
+  return kpFilter.value
+    ? withIndex.filter((it) => kpKeyOf(it.q) === kpFilter.value)
+    : withIndex
+})
+
+// 相邻两题跨到另一个二级知识点时，给这一行加个分段提示
+const isGroupStart = (pos: number) =>
+  pos === 0 || kpKeyOf(viewList.value[pos - 1].q) !== kpKeyOf(viewList.value[pos].q)
+
+// —— 知识点整段排序 ——
+// 一个知识点对应题目列表里的一段。调整知识点顺序时，整段题目一起移动，
+// 所以这里统一用「按知识点分桶 → 按给定顺序拼回」来实现所有涉及段落顺序的操作。
+const kpDragKey = ref<string | null>(null)
+
+const groupSelectedByKp = () => {
+  const map = new Map<string, any[]>()
+  for (const q of selectedList.value) {
+    const key = kpKeyOf(q)
+    if (!map.has(key)) map.set(key, [])
+    map.get(key)!.push(q)
+  }
+  return map
+}
+
+// 按给定顺序重排：每个知识点的题目整段搬过去，段内保持原有相对顺序
+const applyKpOrder = (order: string[]) => {
+  const map = groupSelectedByKp()
+  selectedList.value = order.flatMap((key) => map.get(key) || [])
+  swapIndex.value = null
+}
+
+const kpLabelOf = (key: string) => kpList.value.find((k) => k.key === key)?.name || '该知识点'
+
+// 把 fromKey 这一段挪到 toKey 所在的位置（拖动过程中实时预览，silent 时不弹提示）
+const moveKpTo = (fromKey: string, toKey: string, silent = false) => {
+  const map = groupSelectedByKp()
+  const order = [...map.keys()]
+  const from = order.indexOf(fromKey)
+  const to = order.indexOf(toKey)
+  if (from < 0 || to < 0 || from === to) return
+  order.splice(from, 1)
+  order.splice(to, 0, fromKey)
+  applyKpOrder(order)
+  if (!silent) {
+    const moved = (map.get(fromKey) || []).length
+    ElMessage.success(`已把「${kpLabelOf(fromKey)}」整段（${moved} 题）移到第 ${to + 1} 段`)
+  }
+}
+
+const onKpDragStart = (key: string) => {
+  if (kpFiltering.value) return
+  kpDragKey.value = key
+}
+const onKpDragOver = (key: string) => {
+  const fromKey = kpDragKey.value
+  if (!fromKey || fromKey === key) return
+  moveKpTo(fromKey, key, true) // 拖动过程只做实时预览
+  kpDragKey.value = key
+}
+const onKpDragEnd = () => {
+  kpDragKey.value = null
+}
+
+// 把同一二级知识点的题聚成一段，段的先后按题量降序，段内保持原有相对顺序。
+// 注意这里要显式按题量排序：左栏平时是按题目顺序（即当前段落顺序）排的，直接用它等于没排序。
+const arrangeByKp = () => {
+  const order = [...kpList.value].sort((a, b) => b.total - a.total).map((k) => k.key)
+  applyKpOrder(order)
+  ElMessage.success(`已按二级知识点排列，共分成 ${order.length} 段`)
+}
+
 // 打开「已选题目」：按当前顺序取回题目详情（顺序 = 打印/导出顺序）
 const openSelected = async () => {
   const ids: number[] = form.questionIds || []
   if (!ids.length) return
   swapIndex.value = null
   selectedFullIds.value = []
+  kpFilter.value = '' // 每次打开都从「全部」开始，避免上次的筛选残留
   selectedVisible.value = true
   selectedLoading.value = true
   try {
@@ -837,6 +1019,7 @@ const openSelected = async () => {
 
 // 点击整行：点选两题互换位置（点自己 = 取消选中）
 const onSelRowClick = (index: number) => {
+  if (kpFiltering.value) return // 筛选中只作查看，见下方 moveSelected 的说明
   if (swapIndex.value === null) {
     swapIndex.value = index
     return
@@ -887,6 +1070,9 @@ const moveTo = async (from: number, to: number, feedback = true) => {
 
 // 上移 / 下移
 const moveSelected = (index: number, delta: number) => {
+  // 筛选中禁止调序：此时列表是子集，「上移一位」到底跟哪道题换位置是说不清的，
+  // 与其给一个含糊的结果，不如明确要求先切回「全部」。
+  if (kpFiltering.value) return
   moveTo(index, index + delta)
 }
 
@@ -896,6 +1082,7 @@ const moveSelected = (index: number, delta: number) => {
  * 那时用 id 重新算出当前位置，再拿同一个数字来一次就是空操作，天然幂等。
  */
 const applyGoto = (id: number, raw: string) => {
+  if (kpFiltering.value) return
   const len = selectedList.value.length
   const from = selectedList.value.findIndex((q) => q.id === id)
   if (from < 0) return
@@ -943,10 +1130,12 @@ const clearSelected = () => {
   selectedList.value = []
   swapIndex.value = null
   selectedFullIds.value = []
+  kpFilter.value = ''
 }
 
 // 拖拽排序：拖过某一行即把该行插到目标位置（实时预览）
 const onSelDragStart = (index: number) => {
+  if (kpFiltering.value) return
   dragIndex.value = index
   swapIndex.value = null
 }
@@ -1385,10 +1574,157 @@ onMounted(load)
   font-size: 13px;
   line-height: 1.6;
 }
+/* 左栏二级知识点 + 右栏题目列表；窄屏自动堆叠 */
+.sel-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.sel-kp {
+  flex-shrink: 0;
+  width: 208px;
+  max-height: 68vh;
+  overflow-y: auto;
+  padding: 10px 8px;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.5);
+}
+.sel-kp__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--hair);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: var(--ink-soft);
+}
+.sel-kp__arrange {
+  margin-left: auto;
+  height: 22px;
+  padding: 0 4px;
+  letter-spacing: 0;
+}
+.sel-kp__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sel-kp__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color var(--dur) var(--ease);
+}
+.sel-kp__item:hover {
+  background: rgba(255, 255, 255, 0.75);
+}
+.sel-kp__item.is-active {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(246, 246, 243, 0.7));
+  box-shadow: var(--lit-top), var(--lit-deep);
+}
+.sel-kp__handle {
+  flex-shrink: 0;
+  cursor: grab;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1;
+  padding: 0 1px;
+  opacity: 0.4;
+  transition:
+    opacity var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+.sel-kp__item:hover .sel-kp__handle {
+  opacity: 1;
+}
+.sel-kp__handle:hover {
+  color: var(--moss-deep);
+}
+.sel-kp__handle:active {
+  cursor: grabbing;
+}
+/* 「全部」左侧的占位，只为让名称列对齐 */
+.sel-kp__handle.is-ghost {
+  visibility: hidden;
+}
+/* 正在拖动的知识点 */
+.sel-kp__item.is-kp-dragging {
+  opacity: 0.55;
+}
+.sel-kp__name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--ink-regular);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sel-kp__item.is-active .sel-kp__name {
+  color: var(--ink);
+  font-weight: 600;
+}
+.sel-kp__count {
+  flex-shrink: 0;
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.sel-kp__item.is-active .sel-kp__count {
+  color: var(--moss-deep);
+}
+.sel-kp__hint {
+  margin: 8px 8px 2px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--moss-deep);
+}
 .sel-wrap {
+  flex: 1;
+  min-width: 0;
   max-height: 68vh;
   overflow-y: auto;
   padding-right: 4px;
+}
+/* 相邻题目跨到另一个二级知识点：左侧加一道琥珀金短条，一眼看出分段在哪 */
+.sel-row.is-group-start {
+  position: relative;
+  margin-top: 14px;
+}
+.sel-row.is-group-start:first-child {
+  margin-top: 0;
+}
+.sel-row.is-group-start::before {
+  content: '';
+  position: absolute;
+  left: -1px;
+  top: 14px;
+  width: 3px;
+  height: 22px;
+  border-radius: 0 3px 3px 0;
+  background: var(--moss);
+}
+@media (max-width: 900px) {
+  .sel-body {
+    flex-direction: column;
+  }
+  .sel-kp {
+    width: 100%;
+    max-height: none;
+  }
+  /* 窄屏排成两列，省一半高度 */
+  .sel-kp__list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px 8px;
+  }
 }
 /* 行容器：TransitionGroup 的重排位移动画需要一个相对定位的父级 */
 .sel-list {
