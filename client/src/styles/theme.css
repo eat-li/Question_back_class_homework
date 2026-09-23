@@ -112,6 +112,15 @@ body::before {
   border: 1px solid var(--edge);
   border-radius: var(--radius);
   box-shadow: var(--shadow-soft);
+  /*
+   * Element Plus 给 .el-card 设了 overflow:hidden、给 .el-card__body 设了 overflow:auto。
+   * 按 CSS 规范，祖先的 overflow 只要不是 visible 就是「滚动容器」，哪怕它自己根本不滚动；
+   * 而 position:sticky 是相对「最近的滚动容器」定位的 —— 于是卡片里的 sticky 元素必然失效：
+   * 真正在滚动的是 MainLayout 的 .main，却被这两层截住，sticky 就永远不动。
+   * 卡片本身自适应高度、body 也从不会真的滚动，所以这里放开：
+   * 卡片用 clip 保留圆角裁切但不产生滚动容器，body 直接 visible。
+   */
+  overflow: clip;
   transition:
     border-color var(--dur) var(--ease),
     box-shadow var(--dur) var(--ease);
@@ -122,6 +131,8 @@ body::before {
 }
 .el-card__body {
   padding: 20px 22px;
+  /* 同 .el-card：去掉 EP 默认的 overflow:auto，否则它是卡片内 sticky 失效的元凶 */
+  overflow: visible;
 }
 
 /* ============================================================================

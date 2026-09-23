@@ -461,9 +461,15 @@ watch(
 .kside {
   flex-shrink: 0;
   width: 218px;
+  /*
+   * 侧栏钉住，不随题目列表上下滚。
+   * 前提：祖先里不能有「非 visible 的 overflow」，否则那个祖先会成为最近的滚动容器，
+   * sticky 就被钉死在一个从不滚动的盒子上（Element Plus 的 .el-card / .el-card__body
+   * 正是这种情况，已在 theme.css 里放开）。top 给一点间距，贴着顶栏不好看。
+   */
   position: sticky;
-  top: 0;
-  max-height: calc(100vh - 240px);
+  top: 12px;
+  max-height: calc(100vh - 160px);
   overflow-y: auto;
   padding: 12px 10px;
   border: 1px solid var(--edge);
