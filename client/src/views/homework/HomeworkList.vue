@@ -255,8 +255,8 @@
   >
     <div class="sel-hint">
       <template v-if="swapIndex === null">
-        点击任意一题选中，再点另一题即可<b>互换位置</b>；也可拖动左侧 ⠿
-        或用「上移/下移」微调，点「查看整题」可展开完整题目。
+        直接改左侧<b>题号</b>并回车，即可把该题移到指定位置（其余题目自动让位）；也可拖动 ⠿
+        或用「上移/下移」微调，或点击两题<b>互换位置</b>。点「查看整题」可展开完整题目。
       </template>
       <template v-else>
         已选中第 <b>{{ swapIndex + 1 }}</b> 题 —— 再点另一题交换位置，点自己或点「取消选中」放弃。
@@ -265,11 +265,17 @@
     </div>
     <div v-loading="selectedLoading" class="sel-wrap">
       <el-empty v-if="!selectedLoading && !selectedList.length" description="还没有选择题目" />
-      <div
-        v-for="(q, i) in selectedList"
-        :key="q.id"
-        class="sel-row"
-        :class="{ 'is-dragging': dragIndex === i, 'is-picked': swapIndex === i }"
+      <TransitionGroup name="sel" tag="div" class="sel-list">
+        <div
+          v-for="(q, i) in selectedList"
+          :key="q.id"
+          :data-id="q.id"
+          class="sel-row"
+          :class="{
+            'is-dragging': dragIndex === i,
+            'is-picked': swapIndex === i,
+            'is-flash': flashId === q.id
+          }"
         :title="
           swapIndex === null ? '点击选中该题，再点另一题即可交换顺序' : '点击与选中题目交换位置'
         "
@@ -277,7 +283,19 @@
         @dragover.prevent="onSelDragOver(i)"
         @drop.prevent="onSelDrop"
       >
-        <span class="sel-no" :class="{ 'is-picked': swapIndex === i }">{{ i + 1 }}</span>
+        <!-- 题号可直接改：输入目标位置后回车，本题就移到那里，其余题目依次让位 -->
+        <input
+          class="sel-no"
+          :class="{ 'is-picked': swapIndex === i }"
+          type="text"
+          inputmode="numeric"
+          :value="i + 1"
+          :title="`当前第 ${i + 1} 题；改成目标题号并回车，可直接移到该位置`"
+          @click.stop
+          @keydown.enter.stop.prevent="onGoto(q.id, $event)"
+          @keydown.esc.stop="onGotoEsc(i, $event)"
+          @blur="onGoto(q.id, $event)"
+        />
         <span
           class="sel-handle"
           draggable="true"
@@ -328,6 +346,7 @@
           >
         </div>
       </div>
+      </TransitionGroup>
     </div>
     <template #footer>
       <el-button @click="selectedVisible = false">取消</el-button>
@@ -518,7 +537,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { Plus, Edit, EditPen, Download, Delete, Notebook } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -831,15 +850,72 @@ const onSelRowClick = (index: number) => {
   ElMessage.success(`已交换第 ${from + 1} 题与第 ${index + 1} 题的位置`)
 }
 
-// 上移 / 下移
-const moveSelected = (index: number, delta: number) => {
-  const target = index + delta
-  if (target < 0 || target >= selectedList.value.length) return
+// —— 排序反馈：高亮刚移动的题 + 把它滚进视野 + 文字提示 ——
+// 之前上移/下移只改数据，列表里完全看不出是哪一题动了，所以这三件事要一起做。
+const flashId = ref<number | null>(null)
+let flashTimer: ReturnType<typeof setTimeout> | null = null
+
+const scrollRowIntoView = (id: number) => {
+  const el = document.querySelector(`.sel-row[data-id="${id}"]`)
+  if (el && typeof el.scrollIntoView === 'function') {
+    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }
+}
+
+// 把第 from 题插到 to 位置（其余题目依次让位）。
+// feedback=false 用于拖拽过程中的实时预览——那时每划过一行都会触发，不能弹提示。
+const moveTo = async (from: number, to: number, feedback = true) => {
+  const len = selectedList.value.length
+  if (from === to || from < 0 || to < 0 || from >= len || to >= len) return
   const arr = selectedList.value.slice()
-  const [item] = arr.splice(index, 1)
-  arr.splice(target, 0, item)
+  const [item] = arr.splice(from, 1)
+  arr.splice(to, 0, item)
   selectedList.value = arr
   swapIndex.value = null // 位置已变化，清掉点选态避免错位
+  if (!feedback) return
+
+  flashId.value = item.id
+  if (flashTimer) clearTimeout(flashTimer)
+  flashTimer = setTimeout(() => (flashId.value = null), 1800)
+  ElMessage.success(`第 ${from + 1} 题已移到第 ${to + 1} 位`)
+  await nextTick()
+  scrollRowIntoView(item.id)
+}
+
+// 上移 / 下移
+const moveSelected = (index: number, delta: number) => {
+  moveTo(index, index + delta)
+}
+
+/**
+ * 直接改题号：输入目标位置后回车（或失焦）即生效。
+ * 这里按「题目 id」定位而不是按行号：重排会让 DOM 移动、输入框失焦再触发一次 blur，
+ * 那时用 id 重新算出当前位置，再拿同一个数字来一次就是空操作，天然幂等。
+ */
+const applyGoto = (id: number, raw: string) => {
+  const len = selectedList.value.length
+  const from = selectedList.value.findIndex((q) => q.id === id)
+  if (from < 0) return
+  const n = Number(String(raw).trim())
+  if (!Number.isInteger(n) || n < 1 || n > len) {
+    ElMessage.warning(`题号请填 1 ~ ${len} 之间的整数`)
+    return
+  }
+  moveTo(from, n - 1)
+}
+
+const onGoto = (id: number, e: Event) => {
+  const el = e.target as HTMLInputElement
+  applyGoto(id, el.value)
+  // 输入非法或原地不动时，把框里的数字恢复成当前真实题号
+  const idx = selectedList.value.findIndex((q) => q.id === id)
+  if (idx >= 0) el.value = String(idx + 1)
+}
+
+const onGotoEsc = (index: number, e: Event) => {
+  const el = e.target as HTMLInputElement
+  el.value = String(index + 1)
+  el.blur()
 }
 
 const removeSelected = (index: number) => {
@@ -873,7 +949,7 @@ const onSelDragStart = (index: number) => {
 }
 const onSelDragOver = (index: number) => {
   if (dragIndex.value === null || dragIndex.value === index) return
-  moveSelected(dragIndex.value, index - dragIndex.value)
+  moveTo(dragIndex.value, index, false) // 拖拽预览不弹提示
   dragIndex.value = index
 }
 const onSelDragEnd = () => {
@@ -1311,6 +1387,36 @@ onMounted(load)
   overflow-y: auto;
   padding-right: 4px;
 }
+/* 行容器：TransitionGroup 的重排位移动画需要一个相对定位的父级 */
+.sel-list {
+  position: relative;
+}
+/*
+ * 重排时整行平滑滑到新位置——这是「变化不明显」的主要解法。
+ * 必须写成 .sel-row.sel-move：scoped 下 .sel-move 与 .sel-row 特异度相同，
+ * 而 .sel-row 在后面又声明了自己的 transition，会把这里的规则整条覆盖掉，
+ * Vue 的 hasCSSTransform 检测不到 transform 就直接跳过 FLIP 动画（踩过一次）。
+ */
+.sel-row.sel-move {
+  transition: transform 0.34s var(--ease);
+}
+.sel-row.sel-enter-active,
+.sel-row.sel-leave-active {
+  transition:
+    opacity 0.22s var(--ease),
+    transform 0.22s var(--ease);
+}
+.sel-row.sel-enter-from,
+.sel-row.sel-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+.sel-row.sel-leave-active {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 0;
+}
 .sel-row {
   display: flex;
   align-items: flex-start;
@@ -1340,22 +1446,57 @@ onMounted(load)
   opacity: 0.55;
   border-style: dashed;
 }
+/* 刚被移动的题：琥珀金描边 + 两次呼吸，明确告诉用户「动的是这一题」
+   （只动 background-color，避免和 TransitionGroup 的 transform 位移打架） */
+.sel-row.is-flash {
+  border-color: var(--moss);
+  box-shadow: 0 0 0 3px rgba(150, 104, 26, 0.3), var(--shadow-hover);
+  animation: selFlash 0.75s var(--ease) 2;
+}
+@keyframes selFlash {
+  0%,
+  100% {
+    background-color: rgba(255, 255, 255, 0.55);
+  }
+  50% {
+    background-color: var(--moss-soft);
+  }
+}
+/* 题号本身就是一个输入框：改数字 + 回车，可直接把该题移到目标位置 */
 .sel-no {
   flex-shrink: 0;
-  width: 22px;
-  height: 22px;
-  line-height: 22px;
+  width: 46px;
+  height: 30px;
+  padding: 0 4px;
   text-align: center;
-  border-radius: 50%;
-  background: var(--moss-soft);
+  border-radius: 8px;
+  border: 1px solid var(--edge);
+  background: rgba(255, 255, 255, 0.72);
   color: var(--moss-deep);
-  font-size: 12px;
-  font-weight: 600;
-  transition: all 0.15s ease;
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 700;
+  outline: none;
+  cursor: text;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+.sel-no:hover {
+  border-color: rgba(150, 104, 26, 0.5);
+  background: #fff;
+}
+.sel-no:focus {
+  border-color: var(--moss);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(150, 104, 26, 0.2);
 }
 .sel-no.is-picked {
   background: var(--moss);
   color: var(--on-accent);
+  border-color: var(--moss);
 }
 .sel-handle {
   flex-shrink: 0;
