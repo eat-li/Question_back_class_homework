@@ -1,8 +1,10 @@
 // AI 控制器：OpenAI 兼容接口
 //  - /ai/format         题目智能排版（文本 → 规范 HTML）
+//  - /ai/answer         依据题干补出「答案与解析」（仅题目本身没有解析时使用）
 //  - /ai/lesson-summary 课时总结生成（读取作业题目 → 四段式总结）
 const { ok, fail } = require('../utils/response')
 const { Homework, HomeworkQuestion, Question, Student } = require('../models')
+const TYPE_TEXT = { choice: '选择题', fill: '填空题', solve: '解答题' }
 
 const SYSTEM_PROMPT = `你是数学老师专用的题目排版助手。用户会给你一段已经写好的内容（可能只是题干，也可能是题干+选项，或者答案与解析），请把它整理成规范的 HTML 富文本，用于网页展示。要求：
 
@@ -20,6 +22,14 @@ const LESSON_PROMPT = `你是数学老师专用的教学助理。下面会给出
 4. 每一段都是独立完整的一段话；不要使用 Markdown 标题、列表符号或编号；不要抄录题目原文。
 5. 只输出 JSON，不要代码块、不要多余解释，格式严格为：
 {"content":"上课内容文本","classStatus":"上课状态文本","homeworkTask":"课后任务文本"}`
+
+const ANSWER_PROMPT = `你是数学老师专用的解题助手。下面会给你一道数学题（题干，可能带选项与补充说明）。请给出这道题的「答案与解析」，用于老师自己的题库记录。要求：
+
+1. 内容顺序：先给最终答案，再给解析（解题思路与关键步骤）。解析要让学生看得懂，但不必逐字啰嗦。
+2. 数学公式（重点）：所有公式一律用 $...$（行内）或 $$...$$（独立成行）包裹。分式用 \\dfrac{分子}{分母}；根号用 \\sqrt{...}；上下标用 ^ 与 _（如 x^2、a_{1}）；希腊字母用 \\alpha \\beta \\gamma \\theta \\lambda \\pi \\sigma \\varphi 等；常用符号用 \\ge \\le \\ne \\pm \\times \\div \\in \\subset \\cup \\cap \\infty \\sum \\prod \\rightarrow 等。
+3. 禁止事项：严禁输出 Unicode 数学符号（如 ² ³ √ ∑ ≥ ≤ ≠ ½ α β），必须全部写成 LaTeX 命令；严禁在公式外面使用 $ 字符。
+4. 不得臆造条件：严禁改动题干里的任何数字、条件与符号。如果题目信息不足以唯一确定答案（例如依赖图形而图无法从文字判断、条件缺失、有多个解），必须如实说明「题目信息不足」并指出缺什么，不要硬编一个答案。
+5. 输出：只输出 HTML 片段本身——先 <p><strong>答案：</strong>…</p>，再 <p><strong>解析：</strong>…</p>（解析可多段）。不要 <html>、<body>、<head> 等外层标签，不要用 \`\`\` 代码块标记包裹，不要任何解释说明或客套话。`
 
 // 默认面向 DeepSeek OpenAI 兼容接口；也可通过 .env 覆盖
 const DEFAULT_BASE_URL = process.env.AI_BASE_URL || 'https://api.deepseek.com/v1'
@@ -351,6 +361,58 @@ exports.format = async (req, res, next) => {
   }
 }
 
+// 依据题干补出「答案与解析」：只给题目本身还没有解析的题用。
+// 传 questionId 由后端读题（前端不必把题干再传一遍，也不会传错题）。
+exports.generateAnswer = async (req, res, next) => {
+  let targetBase = ''
+  try {
+    const { questionId, apiKey, baseUrl, model } = req.body || {}
+    if (!questionId) return fail(res, 40000, '缺少题目 id')
+
+    const q = await Question.findByPk(questionId)
+    if (!q) return fail(res, 40400, '题目不存在')
+
+    const target = resolveAiTarget({ apiKey, baseUrl, model })
+    if (target.error) return fail(res, 40000, target.error)
+    targetBase = target.base
+
+    // 发给模型的是纯文本：题干里的 HTML 标签对解题没帮助，反而干扰
+    const options = Array.isArray(q.options) ? q.options : []
+    const userContent = [
+      `题型：${TYPE_TEXT[q.type] || q.type || '未知'}`,
+      q.knowledgeTag
+        ? `知识点：${q.knowledgeTag}${q.knowledgeSubTag ? ' / ' + q.knowledgeSubTag : ''}`
+        : '',
+      '',
+      '题干：',
+      plainText(q.title) || '（题干为空）',
+      options.length
+        ? '\n选项：\n' +
+          options
+            .map((o, i) => `${String.fromCharCode(65 + i)}. ${typeof o === 'string' ? o : JSON.stringify(o)}`)
+            .join('\n')
+        : '',
+      q.body ? '\n补充说明：\n' + plainText(q.body) : ''
+    ]
+      .filter(Boolean)
+      .join('\n')
+
+    const raw = await callChat({
+      ...target,
+      messages: [
+        { role: 'system', content: ANSWER_PROMPT },
+        { role: 'user', content: userContent }
+      ]
+    })
+    const html = cleanAiHtml(raw)
+    if (!html) return fail(res, 50200, 'AI 未返回解析内容')
+
+    ok(res, { html }, '已生成答案与解析')
+  } catch (e) {
+    replyAiError(res, next, e, targetBase)
+  }
+}
+
 // 课时总结生成：读取作业题目 → 四段式总结（上课内容 / 上课状态 / 课后任务）
 exports.lessonSummary = async (req, res, next) => {
   let targetBase = ''
@@ -380,7 +442,6 @@ exports.lessonSummary = async (req, res, next) => {
       studentName = st?.name || ''
     }
 
-    const TYPE_TEXT = { choice: '选择题', fill: '填空题', solve: '解答题' }
     const list = ordered
       .map((q, i) => {
         const tag = [q.knowledgeTag, q.knowledgeSubTag].filter(Boolean).join(' / ')

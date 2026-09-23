@@ -54,6 +54,7 @@
         :key="q.id"
         :question="q"
         :no="(page - 1) * pageSize + idx + 1"
+        @generated="(html: string) => (q.answer = html)"
       />
     </div>
 

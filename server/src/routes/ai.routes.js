@@ -4,6 +4,7 @@ const c = require('../controllers/ai.controller')
 
 router.get('/config', c.config)
 router.post('/format', c.format)
+router.post('/answer', c.generateAnswer)
 router.post('/lesson-summary', c.lessonSummary)
 
 module.exports = router

@@ -97,6 +97,7 @@
             :question="q"
             :no="(page - 1) * pageSize + idx + 1"
             :show-tags="false"
+            @generated="(html: string) => (q.answer = html)"
           >
             <template #handle>
               <span

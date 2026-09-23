@@ -31,10 +31,16 @@
       </div>
     </div>
 
-    <div v-if="question.answer" class="qcard__foot">
-      <el-button link type="primary" @click="expanded = !expanded">
+    <div class="qcard__foot">
+      <el-button v-if="question.answer" link type="primary" @click="expanded = !expanded">
         {{ expanded ? '收起答案与解析' : '查看答案与解析' }}
       </el-button>
+      <!-- 还没有解析时，这里给一个就地补齐的入口 -->
+      <AiAnswerButton
+        v-else
+        :question="question"
+        @generated="(html: string) => emit('generated', html)"
+      />
     </div>
 
     <div v-if="expanded && question.answer" class="qcard__answer" @click="onContentClick">
@@ -51,6 +57,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import RichContent from './RichContent.vue'
+import AiAnswerButton from './AiAnswerButton.vue'
 import { questionTypeLabel as typeLabel } from '../utils/format'
 
 const props = withDefaults(
@@ -63,6 +70,9 @@ const props = withDefaults(
   }>(),
   { showTags: true }
 )
+
+// AI 补齐解析后把结果抛给页面，由页面更新它自己那份数据
+const emit = defineEmits<{ (e: 'generated', html: string): void }>()
 
 const expanded = ref(false)
 

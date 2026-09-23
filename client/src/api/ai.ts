@@ -3,6 +3,8 @@ import type {
   AiConfig,
   AiFormatPayload,
   AiFormatResult,
+  AiAnswerPayload,
+  AiAnswerResult,
   AiLessonSummaryPayload,
   AiLessonSummaryResult
 } from '../types'
@@ -14,6 +16,10 @@ export const getAiConfig = (): Promise<AiConfig> => request.get('/ai/config')
 // 大模型生成较慢，单独放宽超时（默认全局 10s 必然超时）
 export const formatQuestion = (data: AiFormatPayload): Promise<AiFormatResult> =>
   request.post('/ai/format', data, { timeout: 120000 })
+
+// AI 生成「答案与解析」：只传题目 id，由后端读题并拼提示词
+export const generateQuestionAnswer = (data: AiAnswerPayload): Promise<AiAnswerResult> =>
+  request.post('/ai/answer', data, { timeout: 120000 })
 
 // AI 课时总结：后端读取该作业的题目，生成「上课内容 / 上课状态 / 课后任务」
 export const generateLessonSummary = (

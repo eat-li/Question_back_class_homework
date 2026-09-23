@@ -158,6 +158,18 @@ export interface AiFormatResult {
   html: string
 }
 
+/** AI 生成「答案与解析」的入参：只传题目 id，题干由后端自己读，前端不必也不该重传 */
+export interface AiAnswerPayload {
+  questionId: number
+  apiKey?: string
+  baseUrl?: string
+  model?: string
+}
+
+export interface AiAnswerResult {
+  html: string
+}
+
 /** 课时总结的 AI 生成入参（学生/时间由前端补充，这里传作业与可用凭据） */
 export interface AiLessonSummaryPayload {
   homeworkId: number

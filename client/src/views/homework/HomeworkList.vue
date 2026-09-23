@@ -331,6 +331,8 @@
           <el-button size="small" text @click.stop="toggleSelectedFull(q.id)">
             {{ isSelectedFull(q.id) ? '收起' : '查看整题' }}
           </el-button>
+          <!-- 这道题还没有解析时，可以直接让 AI 补一份（有解析就不会出现） -->
+          <AiAnswerButton :question="q" @generated="(html: string) => (q.answer = html)" />
           <el-button size="small" text :disabled="i === 0" @click.stop="moveSelected(i, -1)"
             >上移</el-button
           >
@@ -554,6 +556,7 @@ import { getQuestions, getQuestionTags, getQuestionSubTags } from '../../api/que
 import { getStudents } from '../../api/student'
 import { getSummaries } from '../../api/summary'
 import RichContent from '../../components/RichContent.vue'
+import AiAnswerButton from '../../components/AiAnswerButton.vue'
 import LessonSummaryDialog from '../../components/LessonSummaryDialog.vue'
 import { printHtml, PAPER_FONT } from '../../utils/printHtml'
 import { renderMathInHtml } from '../../utils/mathRender'
