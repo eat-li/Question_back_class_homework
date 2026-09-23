@@ -25,8 +25,11 @@
           >
             <el-icon class="kb-card__rename" @click.stop="renameTag(g)"><EditPen /></el-icon>
           </el-tooltip>
+          <div class="kb-card__count" aria-label="题目数量">
+            <strong>{{ g.total }}</strong>
+            <span>题</span>
+          </div>
         </div>
-        <div class="kb-card__count">{{ g.total }} 题</div>
         <div class="kb-card__types">
           <span v-if="g.choice">选择 {{ g.choice }}</span>
           <span v-if="g.fill">填空 {{ g.fill }}</span>
@@ -177,42 +180,42 @@ onMounted(load)
 }
 .kb-grid {
   display: grid;
-  /*
-   * 卡片再放大一档：最小列宽 220→260px，实测卡片宽 239→302px、每行 4 张。
-   * 302px 卡片的内宽约 266px，正好容下两个二级标签（每个约 100px + 间距），
-   * 二级全部平铺时行数减半，卡片被撑高的幅度也随之变小。
-   */
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 16px;
-  /* 二级很多的卡片自己撑高，不拉伸同排其它卡 */
   align-items: start;
 }
 .kb-card {
-  border: 1px solid var(--edge);
-  border-radius: var(--radius);
+  position: relative;
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--moss);
+  border-radius: 8px;
   padding: 18px;
   cursor: pointer;
-  background-color: transparent;
-  background-image: linear-gradient(180deg, var(--glass-bg-strong), var(--glass-bg));
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  box-shadow: var(--shadow-soft);
-  transition: all 0.2s ease;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(24, 30, 36, 0.06);
+  transition:
+    border-color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
 }
 .kb-card:hover {
-  border-color: rgba(150, 104, 26, 0.5);
-  box-shadow: var(--shadow-hover);
-  transform: translateY(-2px);
+  border-color: var(--line-strong);
+  border-left-color: var(--moss-deep);
+  box-shadow: 0 8px 18px -14px rgba(24, 30, 36, 0.5);
+  transform: translateY(-1px);
 }
 .kb-card__head {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  min-width: 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--hair);
 }
 .kb-card__name {
   font-family: var(--font-display);
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 18px;
+  font-weight: 600;
   color: var(--ink);
   min-width: 0;
   overflow: hidden;
@@ -239,14 +242,28 @@ onMounted(load)
   background: var(--moss-soft);
 }
 .kb-card__count {
-  font-size: 13px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  flex-shrink: 0;
+  margin-left: auto;
   color: var(--moss-deep);
-  margin: 6px 0;
+  white-space: nowrap;
+}
+.kb-card__count strong {
+  font-family: var(--font-data);
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.kb-card__count span {
+  font-size: 12px;
 }
 .kb-card__types {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  padding: 11px 0 0;
   font-size: 12px;
   color: var(--ink-soft);
 }
@@ -254,17 +271,17 @@ onMounted(load)
    比胶囊换行更好扫读——胶囊每个宽度随名字长短变化，换行后左右都参差不齐。 */
 .kb-subs {
   list-style: none;
-  margin: 10px 0 0;
-  padding: 6px 0 0;
+  margin: 12px 0 0;
+  padding: 0;
   border-top: 1px solid var(--hair);
 }
 .kb-subs__item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 6px;
-  margin: 0 -6px;
-  border-radius: 8px;
+  padding: 7px 6px;
+  margin: 0;
+  border-radius: 0;
   cursor: pointer;
   transition: background-color var(--dur) var(--ease);
 }
@@ -272,7 +289,7 @@ onMounted(load)
   border-top: 1px solid var(--hair);
 }
 .kb-subs__item:hover {
-  background: rgba(255, 255, 255, 0.62);
+  background: var(--surface-muted);
 }
 .kb-subs__name {
   flex: 1;
@@ -318,5 +335,15 @@ onMounted(load)
 }
 .kb-subs__edit:hover {
   opacity: 1;
+}
+
+@media (max-width: 640px) {
+  .toolbar {
+    flex-wrap: wrap;
+  }
+
+  .kb-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
