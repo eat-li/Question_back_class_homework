@@ -296,26 +296,24 @@
             :key="k.key"
             class="sel-kp__item"
             :class="{ 'is-active': kpFilter === k.key, 'is-kp-dragging': kpDragKey === k.key }"
-            :title="`只看「${k.name}」的题目`"
+            :title="`点击只看「${k.name}」的题目；按住这一行可直接拖动整段顺序`"
+            :draggable="!kpFiltering"
             @click="kpFilter = kpFilter === k.key ? '' : k.key"
+            @dragstart="onKpDragStart(k.key)"
+            @dragend="onKpDragEnd"
             @dragover.prevent="onKpDragOver(k.key)"
             @drop.prevent="onKpDragEnd"
           >
-            <!-- 拖动即可调整知识点顺序，该知识点下的题目整段跟着移动 -->
-            <span
-              class="sel-kp__handle"
-              :draggable="!kpFiltering"
-              title="按住拖动调整知识点顺序（该知识点下的题目整段跟着移动）"
-              @click.stop
-              @dragstart="onKpDragStart(k.key)"
-              @dragend="onKpDragEnd"
-              >⠿</span
-            >
+            <!-- 整个条目都可拖（热区就是这一整行），这个手柄是可拖动的视觉提示 -->
+            <span class="sel-kp__handle" aria-hidden="true">⠿</span>
             <span class="sel-kp__name">{{ k.name }}</span>
             <span class="sel-kp__count">{{ k.total }}</span>
           </li>
         </ul>
-        <p v-if="kpFiltering" class="sel-kp__hint">
+        <p v-if="kpDragKey" class="sel-kp__hint is-dragging">
+          拖到目标知识点上松开，该知识点下的题目整段跟着走
+        </p>
+        <p v-else-if="kpFiltering" class="sel-kp__hint">
           筛选中只作查看用。要调整顺序，请先点「全部」。
         </p>
       </aside>
@@ -938,6 +936,7 @@ const isGroupStart = (pos: number) =>
 // 一个知识点对应题目列表里的一段。调整知识点顺序时，整段题目一起移动，
 // 所以这里统一用「按知识点分桶 → 按给定顺序拼回」来实现所有涉及段落顺序的操作。
 const kpDragKey = ref<string | null>(null)
+const kpDragMoved = ref(false) // 本次拖动是否真的挪动过：没挪动就不要弹提示
 
 const groupSelectedByKp = () => {
   const map = new Map<string, any[]>()
@@ -956,10 +955,9 @@ const applyKpOrder = (order: string[]) => {
   swapIndex.value = null
 }
 
-const kpLabelOf = (key: string) => kpList.value.find((k) => k.key === key)?.name || '该知识点'
-
-// 把 fromKey 这一段挪到 toKey 所在的位置（拖动过程中实时预览，silent 时不弹提示）
-const moveKpTo = (fromKey: string, toKey: string, silent = false) => {
+// 把 fromKey 这一段挪到 toKey 所在的位置。拖动过程中会反复调用，所以只改顺序、不弹提示；
+// 结论式反馈（移到第几段、带走几道题）留到松手时给一次。
+const moveKpTo = (fromKey: string, toKey: string) => {
   const map = groupSelectedByKp()
   const order = [...map.keys()]
   const from = order.indexOf(fromKey)
@@ -968,24 +966,32 @@ const moveKpTo = (fromKey: string, toKey: string, silent = false) => {
   order.splice(from, 1)
   order.splice(to, 0, fromKey)
   applyKpOrder(order)
-  if (!silent) {
-    const moved = (map.get(fromKey) || []).length
-    ElMessage.success(`已把「${kpLabelOf(fromKey)}」整段（${moved} 题）移到第 ${to + 1} 段`)
-  }
 }
 
 const onKpDragStart = (key: string) => {
   if (kpFiltering.value) return
   kpDragKey.value = key
+  kpDragMoved.value = false
 }
 const onKpDragOver = (key: string) => {
   const fromKey = kpDragKey.value
   if (!fromKey || fromKey === key) return
-  moveKpTo(fromKey, key, true) // 拖动过程只做实时预览
+  moveKpTo(fromKey, key) // 实时预览：拖到哪儿列表就排到哪儿
   kpDragKey.value = key
+  kpDragMoved.value = true
 }
+// 松手才给一次结论式反馈：拖到了第几段、这一整段带走了多少题。
+// （拖动过程中逐次弹提示会刷屏，所以只在结束时说一次。）
 const onKpDragEnd = () => {
+  const key = kpDragKey.value
+  const moved = kpDragMoved.value
   kpDragKey.value = null
+  kpDragMoved.value = false
+  if (!key || !moved) return
+  const idx = kpList.value.findIndex((k) => k.key === key)
+  if (idx < 0) return
+  const item = kpList.value[idx]
+  ElMessage.success(`「${item.name}」已移到第 ${idx + 1} 段，整段 ${item.total} 道题一起移动`)
 }
 
 // 把同一二级知识点的题聚成一段，段的先后按题量降序，段内保持原有相对顺序。
@@ -1628,23 +1634,33 @@ onMounted(load)
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(246, 246, 243, 0.7));
   box-shadow: var(--lit-top), var(--lit-deep);
 }
+/*
+ * 拖动手柄：18×20 的可见方块，悬停整行时高亮成琥珀底。
+ * 真正可拖的是整个条目（热区 = 一整行），这里只是「这一行可以拖」的视觉提示。
+ */
 .sel-kp__handle {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 20px;
+  margin-left: -3px;
+  border-radius: 5px;
   cursor: grab;
   color: var(--ink-soft);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1;
-  padding: 0 1px;
-  opacity: 0.4;
+  opacity: 0.55;
   transition:
     opacity var(--dur) var(--ease),
-    color var(--dur) var(--ease);
+    color var(--dur) var(--ease),
+    background-color var(--dur) var(--ease);
 }
 .sel-kp__item:hover .sel-kp__handle {
   opacity: 1;
-}
-.sel-kp__handle:hover {
   color: var(--moss-deep);
+  background: var(--moss-soft);
 }
 .sel-kp__handle:active {
   cursor: grabbing;
@@ -1653,9 +1669,20 @@ onMounted(load)
 .sel-kp__handle.is-ghost {
   visibility: hidden;
 }
-/* 正在拖动的知识点 */
+/* 正在拖动的知识点：琥珀金描边 + 淡底，明确「动的就是这一段」 */
 .sel-kp__item.is-kp-dragging {
-  opacity: 0.55;
+  background: var(--moss-soft);
+  box-shadow: inset 3px 0 0 var(--moss);
+  outline: 1px dashed var(--moss);
+  outline-offset: -1px;
+  opacity: 0.9;
+}
+/* 拖动中的操作提示 */
+.sel-kp__hint.is-dragging {
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--moss-soft);
+  font-weight: 600;
 }
 .sel-kp__name {
   flex: 1;
