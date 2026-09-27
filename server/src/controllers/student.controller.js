@@ -1,6 +1,13 @@
 // 学生管理控制器
 const { Op } = require('sequelize')
-const { Student } = require('../models')
+const {
+  sequelize,
+  Student,
+  HomeworkStudent,
+  Submission,
+  ExamScore,
+  LessonSummary
+} = require('../models')
 const { ok, fail } = require('../utils/response')
 const { cacheDel } = require('../utils/cache')
 
@@ -97,7 +104,22 @@ exports.remove = async (req, res, next) => {
   try {
     const student = await Student.findByPk(req.params.id)
     if (!student) return fail(res, 40400, '学生不存在')
-    await student.destroy()
+
+    // 删学生必须一并清掉引用它的数据：homework_students / submissions / exam_scores 都带着
+    // 非空 studentId 外键。库里没开外键校验时（外包 MySQL 常见）裸删会留下孤儿行，
+    // 之后备份出来的包不自洽，换到有外键的库恢复时就会整包失败。
+    await sequelize.transaction(async (t) => {
+      await HomeworkStudent.destroy({ where: { studentId: student.id }, transaction: t })
+      await Submission.destroy({ where: { studentId: student.id }, transaction: t })
+      await ExamScore.destroy({ where: { studentId: student.id }, transaction: t })
+      // 课时总结属于作业而不是学生，删学生时只解除关联，保留总结本身
+      await LessonSummary.update(
+        { studentId: null },
+        { where: { studentId: student.id }, transaction: t }
+      )
+      await student.destroy({ transaction: t })
+    })
+
     cacheDel('stats:overview')
     ok(res, null, '删除成功')
   } catch (e) {

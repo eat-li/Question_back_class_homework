@@ -1,6 +1,6 @@
 // 题库控制器
 const { Op } = require('sequelize')
-const { Question } = require('../models')
+const { sequelize, Question, HomeworkQuestion } = require('../models')
 const { ok, fail } = require('../utils/response')
 const { cacheGet, cacheSet, cacheDel } = require('../utils/cache')
 
@@ -257,10 +257,22 @@ exports.remove = async (req, res, next) => {
   try {
     const question = await Question.findByPk(req.params.id)
     if (!question) return fail(res, 40400, '题目不存在')
-    await question.destroy()
+
+    // 删题目要一并清掉作业-题目关联：homework_questions.questionId 是非空外键，
+    // 库里没开外键校验（外包 MySQL 常见）时裸删会留下孤儿行，之后导出的备份
+    // 换到有外键的库恢复就会整包失败。顺手把影响面告诉老师，避免静默改动作业。
+    let removedLinks = 0
+    await sequelize.transaction(async (t) => {
+      removedLinks = await HomeworkQuestion.destroy({
+        where: { questionId: question.id },
+        transaction: t
+      })
+      await question.destroy({ transaction: t })
+    })
+
     cacheDel('questions:tags')
     cacheDel('stats:overview')
-    ok(res, null, '删除成功')
+    ok(res, null, removedLinks ? `删除成功，同时从 ${removedLinks} 份作业中移除了该题` : '删除成功')
   } catch (e) {
     next(e)
   }

@@ -121,7 +121,15 @@ const onRestoreFile = async (e: Event) => {
   restoring.value = true
   try {
     const res = await restoreBackup(file)
-    ElMessage.success(`恢复完成：${Object.values(res).reduce((a, b) => a + b, 0)} 条数据已写入`)
+    const total = Object.values(res.counts || {}).reduce((a, b) => a + b, 0)
+    if (res.skippedTotal) {
+      // 备份包里有指向已删数据的孤儿关联，后端已跳过；提醒老师去看一眼是哪些
+      ElMessage.warning(
+        `恢复完成：${total} 条数据已写入，另有 ${res.skippedTotal} 条关联记录因引用的数据已不存在被跳过`
+      )
+    } else {
+      ElMessage.success(`恢复完成：${total} 条数据已写入`)
+    }
   } catch (err: any) {
     // API 错误已由 request.ts 全局提示；这里只兜底非 API 错误
     if (!err?.isApiError) ElMessage.error('恢复失败：' + (err?.message || '备份文件格式有误'))
