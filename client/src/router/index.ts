@@ -64,6 +64,18 @@ const router = createRouter({
           meta: { title: '结论编辑' }
         },
         {
+          path: 'handouts',
+          name: 'handouts',
+          component: () => import('../views/handout/HandoutBuilder.vue'),
+          meta: { title: '发布讲义' }
+        },
+        {
+          path: 'handouts/list',
+          name: 'handoutList',
+          component: () => import('../views/handout/HandoutList.vue'),
+          meta: { title: '讲义列表' }
+        },
+        {
           path: 'homeworks',
           name: 'homeworks',
           component: () => import('../views/homework/HomeworkList.vue'),

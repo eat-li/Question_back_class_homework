@@ -2,7 +2,11 @@
   <el-container class="layout">
     <!-- 侧栏 -->
     <div v-if="navOpen" class="nav-scrim" aria-hidden="true" @click="navOpen = false"></div>
-    <el-aside width="232px" class="aside" :class="{ 'aside--open': navOpen }">
+    <el-aside
+      :width="navRailed ? '72px' : '232px'"
+      class="aside"
+      :class="{ 'aside--open': navOpen, 'aside--collapsed': navRailed }"
+    >
       <div class="brand">
         <div class="brand-mark" aria-hidden="true">∑</div>
         <div class="brand-text">
@@ -11,46 +15,26 @@
         </div>
       </div>
 
-      <el-menu router :default-active="$route.path" class="menu">
-        <el-menu-item index="/dashboard"
-          ><el-icon><House /></el-icon><span>首页</span></el-menu-item
-        >
-        <el-menu-item index="/students"
-          ><el-icon><User /></el-icon><span>学生管理</span></el-menu-item
-        >
-        <el-menu-item index="/questions"
-          ><el-icon><Collection /></el-icon><span>题库管理</span></el-menu-item
-        >
-        <el-menu-item index="/browse"
-          ><el-icon><Reading /></el-icon><span>题目浏览</span></el-menu-item
-        >
-        <el-menu-item index="/conclusions"
-          ><el-icon><Memo /></el-icon><span>结论</span></el-menu-item
-        >
-        <el-menu-item index="/homeworks"
-          ><el-icon><Document /></el-icon><span>作业管理</span></el-menu-item
-        >
-        <el-menu-item index="/summaries"
-          ><el-icon><Notebook /></el-icon><span>课时总结</span></el-menu-item
-        >
-        <el-menu-item index="/homework-view"
-          ><el-icon><View /></el-icon><span>查看作业</span></el-menu-item
-        >
-        <el-menu-item index="/grades"
-          ><el-icon><DocumentAdd /></el-icon><span>成绩录入</span></el-menu-item
-        >
-        <el-menu-item index="/grade-analysis"
-          ><el-icon><TrendCharts /></el-icon><span>成绩分析</span></el-menu-item
-        >
-        <el-menu-item index="/backup"
-          ><el-icon><FolderOpened /></el-icon><span>数据备份</span></el-menu-item
-        >
-        <el-menu-item index="/settings"
-          ><el-icon><Setting /></el-icon><span>系统设置</span></el-menu-item
-        >
+      <el-menu
+        router
+        :default-active="$route.path"
+        class="menu"
+        :collapse="navRailed"
+        :collapse-transition="false"
+        popper-effect="light"
+        popper-class="nav-tip"
+      >
+        <!-- 标题放在 #title 插槽：Element Plus 只在提供该插槽时，才在收起态
+             hover 显示菜单名的浮层提示（标题必须是 menu-item 直接子级 span 才会被收起态隐藏） -->
+        <el-menu-item v-for="item in navItems" :key="item.path" :index="item.path">
+          <el-icon><component :is="item.icon" /></el-icon>
+          <template #title
+            ><span>{{ item.label }}</span></template
+          >
+        </el-menu-item>
       </el-menu>
 
-      <QuickLinks />
+      <QuickLinks v-show="!navRailed" />
 
       <div class="aside-foot">
         <div class="foot-line"></div>
@@ -62,6 +46,15 @@
       <!-- 顶栏 -->
       <el-header class="header">
         <div class="header-heading">
+          <el-button
+            class="nav-collapse"
+            text
+            circle
+            :aria-label="navCollapsed ? '展开导航' : '收起导航'"
+            @click="toggleNav"
+          >
+            <el-icon><component :is="navCollapsed ? Expand : Fold" /></el-icon>
+          </el-button>
           <el-button class="nav-trigger" text circle aria-label="打开导航" @click="navOpen = true">
             <el-icon><Menu /></el-icon>
           </el-button>
@@ -91,7 +84,7 @@
 </template>
 
 <script setup lang="ts">
-import { shallowRef, watch } from 'vue'
+import { shallowRef, ref, computed, markRaw, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   House,
@@ -106,7 +99,11 @@ import {
   FolderOpened,
   Setting,
   Memo,
-  Menu
+  Files,
+  List,
+  Menu,
+  Fold,
+  Expand
 } from '@element-plus/icons-vue'
 import QuickLinks from '../components/QuickLinks.vue'
 import { TOKEN_KEY } from '../api/request'
@@ -114,6 +111,33 @@ import { TOKEN_KEY } from '../api/request'
 const router = useRouter()
 const route = useRoute()
 const navOpen = shallowRef(false)
+// 侧栏收起（仅桌面端生效）：状态持久化，刷新后保持
+const NAV_COLLAPSED_KEY = 'nav-collapsed'
+const navCollapsed = ref(localStorage.getItem(NAV_COLLAPSED_KEY) === '1')
+// 移动端抽屉打开时必须展开显示完整菜单，故收起态仅在抽屉关闭时生效
+const navRailed = computed(() => navCollapsed.value && !navOpen.value)
+const toggleNav = () => {
+  navCollapsed.value = !navCollapsed.value
+  localStorage.setItem(NAV_COLLAPSED_KEY, navCollapsed.value ? '1' : '0')
+}
+
+// 菜单配置：收起态 hover 时用 label 作为浮层提示（见模板注释）
+const navItems = [
+  { path: '/dashboard', label: '首页', icon: markRaw(House) },
+  { path: '/students', label: '学生管理', icon: markRaw(User) },
+  { path: '/questions', label: '题库管理', icon: markRaw(Collection) },
+  { path: '/browse', label: '题目浏览', icon: markRaw(Reading) },
+  { path: '/conclusions', label: '结论', icon: markRaw(Memo) },
+  { path: '/handouts', label: '发布讲义', icon: markRaw(Files) },
+  { path: '/handouts/list', label: '讲义列表', icon: markRaw(List) },
+  { path: '/homeworks', label: '作业管理', icon: markRaw(Document) },
+  { path: '/summaries', label: '课时总结', icon: markRaw(Notebook) },
+  { path: '/homework-view', label: '查看作业', icon: markRaw(View) },
+  { path: '/grades', label: '成绩录入', icon: markRaw(DocumentAdd) },
+  { path: '/grade-analysis', label: '成绩分析', icon: markRaw(TrendCharts) },
+  { path: '/backup', label: '数据备份', icon: markRaw(FolderOpened) },
+  { path: '/settings', label: '系统设置', icon: markRaw(Setting) }
+]
 const today = shallowRef(
   new Date().toLocaleDateString('zh-CN', {
     year: 'numeric',
@@ -157,6 +181,23 @@ const logout = () => {
   -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--edge);
   box-shadow: var(--shadow-soft);
+  transition: width var(--dur) var(--ease);
+}
+
+/* —— 收起态：只留图标窄条 —— */
+.aside--collapsed .brand {
+  padding: 15px 10px;
+  justify-content: center;
+}
+.aside--collapsed .brand-text,
+.aside--collapsed .foot-text {
+  display: none;
+}
+.aside--collapsed .menu {
+  padding: 12px 4px;
+}
+.aside--collapsed .aside-foot {
+  padding: 16px 8px 18px;
 }
 
 .brand {
@@ -177,7 +218,10 @@ const logout = () => {
   border-radius: 12px;
   border: 1px solid var(--edge);
   background: linear-gradient(160deg, rgba(255, 255, 255, 0.92), rgba(238, 240, 240, 0.5));
-  box-shadow: var(--lit-top), var(--lit-deep), 0 6px 14px -8px rgba(24, 30, 36, 0.42);
+  box-shadow:
+    var(--lit-top),
+    var(--lit-deep),
+    0 6px 14px -8px rgba(24, 30, 36, 0.42);
   color: var(--ink);
   font-family: var(--font-display);
   font-size: 24px;
@@ -209,7 +253,6 @@ const logout = () => {
   line-height: 44px;
   margin: 2px 0;
   border-radius: var(--radius-sm);
-  padding-left: 16px !important;
   color: var(--ink-regular);
   font-size: 14px;
   position: relative;
@@ -218,9 +261,29 @@ const logout = () => {
     color var(--dur) var(--ease),
     box-shadow var(--dur) var(--ease);
 }
+/* 展开态左侧留白；收起态交给 Element Plus collapse 的默认内边距，让图标居中 */
+.menu:not(.el-menu--collapse) :deep(.el-menu-item) {
+  padding-left: 16px !important;
+}
+.menu.el-menu--collapse :deep(.el-menu-item) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .menu :deep(.el-menu-item .el-icon) {
   margin-right: 10px;
   font-size: 16px;
+}
+/* 收起态文字被隐藏，图标的右边距会让图标偏移，置零并放大一点保证视觉居中 */
+.menu.el-menu--collapse :deep(.el-menu-item .el-icon) {
+  margin-right: 0;
+  font-size: 18px;
+}
+/* EP 的浮层触发容器按 24px 图标预留 20px 内边距，我们的图标更小会偏左，
+   这里清掉内边距、改为居中排布 */
+.menu.el-menu--collapse :deep(.el-menu-item .el-menu-tooltip__trigger) {
+  padding: 0;
+  justify-content: center;
 }
 .menu :deep(.el-menu-item:hover) {
   background: rgba(255, 255, 255, 0.62);
@@ -231,7 +294,10 @@ const logout = () => {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(246, 246, 243, 0.7));
   color: var(--ink);
   font-weight: 600;
-  box-shadow: var(--lit-top), var(--lit-deep), 0 6px 14px -9px rgba(24, 30, 36, 0.42);
+  box-shadow:
+    var(--lit-top),
+    var(--lit-deep),
+    0 6px 14px -9px rgba(24, 30, 36, 0.42);
 }
 .menu :deep(.el-menu-item.is-active::before) {
   content: '';
@@ -337,6 +403,27 @@ const logout = () => {
   display: none;
 }
 
+/* 桌面端：收起/展开按钮常显 */
+.nav-collapse {
+  display: inline-flex;
+}
+
+/* 收起态 hover 提示浮层：Element Plus 默认深色气泡与整体玻璃质感不搭，
+   这里改为暖白实底 + 细边 + 同款圆角阴影（浮层被 teleport 到 body，需 :global） */
+:global(.el-popper.nav-tip) {
+  padding: 7px 11px;
+  border-radius: var(--radius-sm);
+  border-color: var(--line-strong);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+:global(.el-popper.nav-tip .el-popper__arrow::before) {
+  background: var(--surface);
+  border-color: var(--line-strong);
+}
+
 /* —— 页面切换过渡 —— */
 .page-enter-active {
   transition:
@@ -371,6 +458,10 @@ const logout = () => {
   }
   .nav-trigger {
     display: inline-flex;
+  }
+  /* 移动端抽屉里不显示收起按钮（收起是桌面端能力） */
+  .nav-collapse {
+    display: none;
   }
   .header {
     height: 62px;

@@ -21,6 +21,7 @@ router.use('/ai', require('./ai.routes'))
 router.use('/grades', require('./grade.routes'))
 router.use('/categories', require('./category.routes'))
 router.use('/conclusions', require('./conclusion.routes'))
+router.use('/handouts', require('./handout.routes'))
 router.use('/summaries', require('./summary.routes'))
 
 module.exports = router
