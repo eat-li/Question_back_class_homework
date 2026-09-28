@@ -3,7 +3,7 @@
     <el-card>
       <div class="toolbar">
         <el-button :icon="ArrowLeft" @click="goBack">返回列表</el-button>
-        <span class="title">{{ isEdit ? '编辑结论' : '新建结论' }}</span>
+        <span class="title">{{ isEdit ? '编辑结论' : '发布结论' }}</span>
         <span v-if="isEdit" class="sub">{{ statusLabel }}</span>
       </div>
 
@@ -279,7 +279,8 @@ const save = async (status: 'draft' | 'published') => {
     }
     ElMessage.success(status === 'published' ? '已发布' : '已保存草稿')
     pristine = snapshotForm() // 保存成功，视为已同步，离开不再拦截
-    router.push('/conclusions')
+    // 存完直接回列表，能马上看到刚发布的结论渲染效果
+    router.push('/conclusions/list')
   } catch (err) {
     // 错误提示已由 request.ts 全局弹出
     console.error('保存失败', err)
@@ -307,7 +308,7 @@ onBeforeRouteLeave(async () => {
   }
 })
 
-const goBack = () => router.push('/conclusions')
+const goBack = () => router.push('/conclusions/list')
 const goCategories = () => router.push('/conclusions/categories')
 
 onMounted(async () => {
@@ -337,12 +338,23 @@ onMounted(async () => {
   max-width: 860px;
 }
 .edit-actions {
-  margin-top: 8px;
-  padding-top: 20px;
+  margin-top: 24px;
+  padding-top: 18px;
   border-top: 1px solid var(--line);
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 12px;
+}
+/* 取消单独留在左侧，其余操作靠右：避免手滑点到「取消」丢掉刚写的内容 */
+.edit-actions :deep(.el-button:first-child) {
+  margin-right: auto;
+}
+/* 抵消 Element Plus 默认给相邻按钮加的 12px margin-left：
+   它会和 flex gap 叠加，导致按钮间距忽大忽小（第一颗前面还是 0） */
+.edit-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
 }
 .cat-tip {
   font-size: 12px;

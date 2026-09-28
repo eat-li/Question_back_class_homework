@@ -46,10 +46,18 @@ const router = createRouter({
           meta: { title: '题目浏览' }
         },
         {
+          // 结论主入口 = 发布/编辑页（与「发布讲义」保持一致的用法）
           path: 'conclusions',
-          name: 'conclusions',
+          name: 'conclusionPublish',
+          component: () => import('../views/conclusion/ConclusionEdit.vue'),
+          meta: { title: '发布结论' }
+        },
+        {
+          // 只读浏览：卡片里直接渲染结论正文
+          path: 'conclusions/list',
+          name: 'conclusionList',
           component: () => import('../views/conclusion/ConclusionList.vue'),
-          meta: { title: '结论' }
+          meta: { title: '结论列表' }
         },
         {
           path: 'conclusions/categories',
@@ -58,10 +66,11 @@ const router = createRouter({
           meta: { title: '分类管理' }
         },
         {
+          // 编辑指定结论（列表里的「编辑」按钮走这里）
           path: 'conclusions/edit/:id?',
           name: 'conclusionEdit',
           component: () => import('../views/conclusion/ConclusionEdit.vue'),
-          meta: { title: '结论编辑' }
+          meta: { title: '编辑结论' }
         },
         {
           path: 'handouts',

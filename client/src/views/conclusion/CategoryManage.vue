@@ -374,7 +374,8 @@ const doRemove = async (id: number) => {
   }
 }
 
-const goBack = () => router.push('/conclusions')
+// 分类管理是从「结论列表」进来的，返回列表页（/conclusions 现在是发布页）
+const goBack = () => router.push('/conclusions/list')
 
 onMounted(load)
 </script>
