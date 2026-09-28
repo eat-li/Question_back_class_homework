@@ -7,3 +7,5 @@ dist/
 .workbuddy/
 .pnpm-store/
 .vscode/
+# 本地设计稿与页面截图（体积大，仅本地参考，不入库）
+design-preview/
