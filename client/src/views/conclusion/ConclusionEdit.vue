@@ -60,6 +60,7 @@
 
       <div class="edit-actions">
         <el-button @click="goBack">取消</el-button>
+        <el-button :icon="MagicStick" @click="aiDialogVisible = true">AI 生成</el-button>
         <el-button :icon="View" @click="previewVisible = true">预览</el-button>
         <el-button
           type="warning"
@@ -85,18 +86,28 @@
       <div v-if="form.summary" class="preview-summary">摘要：{{ form.summary }}</div>
       <RichContent :html="form.content" />
     </el-dialog>
+
+    <!-- AI 生成结论内容 -->
+    <AiConclusionDialog
+      v-model="aiDialogVisible"
+      :title="form.title"
+      :intro="form.summary"
+      :category-name="categoryName"
+      @apply="onAiApply"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
-import { ArrowLeft, Check, View } from '@element-plus/icons-vue'
+import { ArrowLeft, Check, View, MagicStick } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getConclusion, createConclusion, updateConclusion } from '../../api/conclusion'
 import { getCategories } from '../../api/category'
 import RichEditor from '../../components/RichEditor.vue'
 import RichContent from '../../components/RichContent.vue'
+import AiConclusionDialog from '../../components/AiConclusionDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -127,6 +138,49 @@ const statusLabel = ref('')
 const originalStatus = ref('draft') // 编辑加载时原始状态，用于「保存草稿撤下已发布」保护
 
 const previewVisible = ref(false)
+const aiDialogVisible = ref(false)
+
+// 当前选中的分类 id / 名称，供 AI 生成作为上下文
+const categoryId = computed(() =>
+  categoryPath.value.length ? categoryPath.value[categoryPath.value.length - 1] : null
+)
+const findCategoryName = (nodes: any[], id: number): string => {
+  for (const n of nodes) {
+    if (n.id === id) return n.name
+    if (n.children?.length) {
+      const r = findCategoryName(n.children, id)
+      if (r) return r
+    }
+  }
+  return ''
+}
+const categoryName = computed(() =>
+  categoryId.value != null ? findCategoryName(cascaderOptions.value, categoryId.value) : ''
+)
+
+// AI 生成结果应用：若已有手写内容则确认覆盖；写回 content/summary/tags
+const onAiApply = async (payload: { content: string; summary: string; tags: string }) => {
+  const plain = (form.content || '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .trim()
+  if (plain) {
+    try {
+      await ElMessageBox.confirm(
+        '当前详细内容已有文字，应用 AI 生成内容会替换它。确定继续？',
+        '替换内容确认',
+        { type: 'warning', confirmButtonText: '替换', cancelButtonText: '取消' }
+      )
+    } catch {
+      return
+    }
+  }
+  form.content = payload.content
+  if (payload.summary) form.summary = payload.summary
+  if (payload.tags) form.tags = payload.tags
+  aiDialogVisible.value = false
+  ElMessage.success('已应用 AI 生成内容')
+}
 
 // —— 保存防连点 + 未保存离开守卫 ——
 const saving = ref<'draft' | 'published' | null>(null)
@@ -238,11 +292,15 @@ const save = async (status: 'draft' | 'published') => {
 onBeforeRouteLeave(async () => {
   if (!isDirty()) return true
   try {
-    await ElMessageBox.confirm('当前有未保存的修改，确定离开？（内容不会被自动保存）', '未保存提示', {
-      type: 'warning',
-      confirmButtonText: '放弃修改并离开',
-      cancelButtonText: '继续编辑'
-    })
+    await ElMessageBox.confirm(
+      '当前有未保存的修改，确定离开？（内容不会被自动保存）',
+      '未保存提示',
+      {
+        type: 'warning',
+        confirmButtonText: '放弃修改并离开',
+        cancelButtonText: '继续编辑'
+      }
+    )
     return true
   } catch {
     return false

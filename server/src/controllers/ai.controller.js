@@ -31,6 +31,24 @@ const ANSWER_PROMPT = `你是数学老师专用的解题助手。下面会给你
 4. 不得臆造条件：严禁改动题干里的任何数字、条件与符号。如果题目信息不足以唯一确定答案（例如依赖图形而图无法从文字判断、条件缺失、有多个解），必须如实说明「题目信息不足」并指出缺什么，不要硬编一个答案。
 5. 输出：只输出 HTML 片段本身——先 <p><strong>答案：</strong>…</p>，再 <p><strong>解析：</strong>…</p>（解析可多段）。不要 <html>、<body>、<head> 等外层标签，不要用 \`\`\` 代码块标记包裹，不要任何解释说明或客套话。`
 
+// 结论生成：从「标题 + 简介 + 分类」一键产出结构化完整内容（讲解/示例/要点）
+const CONCLUSION_PROMPT = `你是数学老师专用的结论编写助手。用户会给一个数学结论的标题、所属分类（可选）和简要说明（可选），请据此生成该结论的完整结构化讲解，用于网页展示与 PDF 导出。要求：
+
+1. 内容分三段，每段以 <h2> 标题开头：
+   - <h2>结构化讲解</h2>：用 2-4 段话详细阐述该结论的含义、前提条件、推导思路与数学本质。条理清晰、语言专业但不晦涩。
+   - <h2>典型示例</h2>：给 1-2 个典型例题（含题目与简要解答），展示该结论的应用。示例要具体、有代表性。
+   - <h2>关键要点</h2>：用 <ul><li> 列出 3-6 条关键要点与易错提醒，每条一句话。
+
+2. 数学公式（重点）：所有公式一律用 $...$（行内）或 $$...$$（独立成行）包裹。分式用 \\dfrac{分子}{分母}；根号用 \\sqrt{...}；上下标用 ^ 与 _（如 x^2、a_{1}）；希腊字母用 \\alpha \\beta \\gamma \\theta \\lambda \\pi \\sigma \\varphi 等；常用符号用 \\ge \\le \\ne \\pm \\times \\div \\in \\subset \\cup \\cap \\infty \\sum \\prod \\rightarrow 等。
+
+3. 禁止事项：严禁输出 Unicode 数学符号（如 ² ³ √ ∑ ≥ ≤ ≠ ½ α β），必须全部转成 LaTeX 命令；严禁在公式外面使用 $ 字符；严禁改变结论的数学含义。
+
+4. 摘要与标签：在 HTML 最前面输出两行 HTML 注释，第一行以 <!--SUMMARY: 开头，写一句话摘要（不超过 80 字，概括该结论的核心内容）；第二行以 <!--TAGS: 开头，写 3-6 个关键词，逗号分隔。例如：
+<!--SUMMARY:等腰三角形顶角的平分线、底边上的中线、底边上的高三线合一-->
+<!--TAGS:三线合一,等腰三角形,几何性质-->
+
+5. 输出：只输出 HTML 片段本身——不要 <html>、<body>、<head> 等外层标签，不要用 \`\`\` 代码块标记包裹，不要任何解释说明或客套话。`
+
 // 默认面向 DeepSeek OpenAI 兼容接口；也可通过 .env 覆盖
 const DEFAULT_BASE_URL = process.env.AI_BASE_URL || 'https://api.deepseek.com/v1'
 const DEFAULT_MODEL = process.env.AI_MODEL || 'deepseek-chat'
@@ -73,7 +91,11 @@ function getAllowedBaseUrls() {
 // 显式放行任意接口地址（自建 / 中转 / 本地模型场景）；
 // 默认关闭，保持白名单带来的 SSRF 防护
 function isAnyBaseUrlAllowed() {
-  return String(process.env.AI_ALLOW_ANY_BASE_URL || '').trim().toLowerCase() === 'true'
+  return (
+    String(process.env.AI_ALLOW_ANY_BASE_URL || '')
+      .trim()
+      .toLowerCase() === 'true'
+  )
 }
 
 // 放行模式下允许 http（本地 Ollama / LM Studio 等），但仍拒绝非 http(s) 协议
@@ -245,7 +267,13 @@ function balanceTags(html) {
       open.push(name)
     }
   }
-  return html + open.reverse().map((n) => `</${n}>`).join('')
+  return (
+    html +
+    open
+      .reverse()
+      .map((n) => `</${n}>`)
+      .join('')
+  )
 }
 
 // 去掉模型凭空补出的答案解析；field === 'answer' 时整段内容本来就是答案，直接放行。
@@ -389,7 +417,10 @@ exports.generateAnswer = async (req, res, next) => {
       options.length
         ? '\n选项：\n' +
           options
-            .map((o, i) => `${String.fromCharCode(65 + i)}. ${typeof o === 'string' ? o : JSON.stringify(o)}`)
+            .map(
+              (o, i) =>
+                `${String.fromCharCode(65 + i)}. ${typeof o === 'string' ? o : JSON.stringify(o)}`
+            )
             .join('\n')
         : '',
       q.body ? '\n补充说明：\n' + plainText(q.body) : ''
@@ -477,6 +508,46 @@ exports.lessonSummary = async (req, res, next) => {
     })
 
     ok(res, parseLessonJson(raw), '生成完成')
+  } catch (e) {
+    replyAiError(res, next, e, targetBase)
+  }
+}
+
+// 结论自动生成：从「标题 + 简介 + 分类」产出结构化完整内容（讲解/示例/要点）。
+// 与排版/解题不同——结论本身就是要生成的内容，因此不调用 stripUnrequestedAnswer。
+// 模型在 HTML 前置 <!--SUMMARY:--> / <!--TAGS:--> 注释，前端解析后填入摘要与标签字段。
+exports.generateConclusion = async (req, res, next) => {
+  let targetBase = ''
+  try {
+    const { title, intro, categoryName, apiKey, baseUrl, model } = req.body || {}
+    if (!title || !String(title).trim()) return fail(res, 40000, '请先填写结论标题')
+
+    const target = resolveAiTarget({ apiKey, baseUrl, model })
+    if (target.error) return fail(res, 40000, target.error)
+    targetBase = target.base
+
+    const userContent = [
+      `结论标题：${String(title).trim()}`,
+      `所属分类：${categoryName ? String(categoryName) : '（未指定）'}`,
+      intro && String(intro).trim() ? `简要说明：${String(intro).trim()}` : '',
+      '',
+      '请生成该结论的完整结构化讲解内容。'
+    ]
+      .filter(Boolean)
+      .join('\n')
+
+    const raw = await callChat({
+      ...target,
+      temperature: 0.4,
+      messages: [
+        { role: 'system', content: CONCLUSION_PROMPT },
+        { role: 'user', content: userContent }
+      ]
+    })
+    const html = cleanAiHtml(raw)
+    if (!html) return fail(res, 50200, 'AI 未返回结论内容')
+
+    ok(res, { html }, '生成完成')
   } catch (e) {
     replyAiError(res, next, e, targetBase)
   }

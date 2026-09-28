@@ -186,6 +186,20 @@ export interface AiLessonSummaryResult {
   homeworkTask: string
 }
 
+/** AI 结论生成的入参：标题必填，简介/分类可选，凭据由 resolveAiCreds 解析 */
+export interface AiConclusionPayload {
+  title: string
+  intro?: string
+  categoryName?: string
+  apiKey?: string
+  baseUrl?: string
+  model?: string
+}
+
+export interface AiConclusionResult {
+  html: string
+}
+
 export interface KnowledgeCategory {
   id: number
   name: string

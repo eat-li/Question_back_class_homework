@@ -6,5 +6,6 @@ router.get('/config', c.config)
 router.post('/format', c.format)
 router.post('/answer', c.generateAnswer)
 router.post('/lesson-summary', c.lessonSummary)
+router.post('/conclusion', c.generateConclusion)
 
 module.exports = router

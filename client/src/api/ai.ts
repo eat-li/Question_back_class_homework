@@ -6,7 +6,9 @@ import type {
   AiAnswerPayload,
   AiAnswerResult,
   AiLessonSummaryPayload,
-  AiLessonSummaryResult
+  AiLessonSummaryResult,
+  AiConclusionPayload,
+  AiConclusionResult
 } from '../types'
 
 // 获取后端 AI 配置状态（不会返回 Key 本身）
@@ -25,3 +27,7 @@ export const generateQuestionAnswer = (data: AiAnswerPayload): Promise<AiAnswerR
 export const generateLessonSummary = (
   data: AiLessonSummaryPayload
 ): Promise<AiLessonSummaryResult> => request.post('/ai/lesson-summary', data, { timeout: 120000 })
+
+// AI 结论生成：从「标题 + 简介 + 分类」产出结构化完整内容（讲解/示例/要点 + 摘要/标签注释）
+export const generateConclusion = (data: AiConclusionPayload): Promise<AiConclusionResult> =>
+  request.post('/ai/conclusion', data, { timeout: 120000 })
