@@ -51,7 +51,7 @@
     <div v-loading="loading" class="ac-preview">
       <div v-if="!hasResult && !loading" class="ac-empty">
         <el-empty
-          description="点击「生成内容」，AI 会据此标题产出「结构化讲解 / 典型示例 / 关键要点」三段内容"
+          description="点击「生成内容」，AI 会据此标题写出这个结论的正文与要点（力求简洁；只有必要时才附一个最简示例）"
         />
       </div>
       <RichContent v-else :html="previewHtml" />
