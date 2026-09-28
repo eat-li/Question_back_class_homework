@@ -14,16 +14,17 @@
               <span class="cat-tree__title">知识点分类</span>
               <span class="cat-tree__count">{{ totalCount }} 个</span>
             </div>
-            <el-button type="primary" :icon="Plus" @click="openCreate()">新建分类</el-button>
+            <el-button type="primary" :icon="Plus" @click="openCreate()">新建一级分类</el-button>
           </div>
 
           <p class="cat-tree__hint">
-            点选左侧分类即可在右侧编辑；新建时在右侧选择「上级分类」决定层级。
+            点选分类在右侧编辑；悬停分类可快速「添加子分类 / 删除」；名称框内按回车可直接保存。
           </p>
 
           <div class="cat-tree__body">
             <el-tree
               v-if="tree.length"
+              ref="treeRef"
               :data="tree"
               node-key="id"
               :props="treeProps"
@@ -40,6 +41,12 @@
                     :class="isChild(data) ? 'is-leaf' : 'is-parent'"
                   ></span>
                   <span class="tree-node__label">{{ data.name }}</span>
+                  <span
+                    class="tree-node__count"
+                    :class="{ 'is-zero': !counts[data.id] }"
+                    :title="`该分类下共 ${counts[data.id] || 0} 条结论`"
+                    >{{ counts[data.id] || 0 }} 条</span
+                  >
                   <span v-if="isChild(data)" class="tree-node__level">二级</span>
                   <span class="tree-node__actions">
                     <el-tooltip
@@ -80,9 +87,15 @@
             <span v-if="parentName" class="cat-form__parent">所属：{{ parentName }}</span>
           </div>
 
-          <el-form :model="form" label-width="80px">
+          <el-form :model="form" label-width="80px" class="cat-form__body">
             <el-form-item label="名称">
-              <el-input v-model="form.name" placeholder="如：代数 / 几何 / 函数" maxlength="50" />
+              <el-input
+                ref="nameInputRef"
+                v-model="form.name"
+                placeholder="如：代数 / 几何 / 函数，回车保存"
+                maxlength="50"
+                @keyup.enter="save"
+              />
             </el-form-item>
             <el-form-item label="上级分类">
               <el-select
@@ -104,7 +117,22 @@
               </div>
             </el-form-item>
             <el-form-item label="排序">
-              <el-input-number v-model="form.sort" :min="0" :max="9999" />
+              <div class="sort-row">
+                <el-input-number v-model="form.sort" :min="0" :max="9999" />
+                <el-tooltip content="与上一个同级分类交换顺序" placement="top" :show-after="400">
+                  <el-button :icon="ArrowUp" :disabled="!canMoveUp" @click="moveSelected(-1)" />
+                </el-tooltip>
+                <el-tooltip content="与下一个同级分类交换顺序" placement="top" :show-after="400">
+                  <el-button :icon="ArrowDown" :disabled="!canMoveDown" @click="moveSelected(1)" />
+                </el-tooltip>
+              </div>
+              <div class="cat-form__tip">
+                {{
+                  form.id
+                    ? `同级第 ${siblingIndex + 1} / ${siblings.length} 个，上移/下移自动保存`
+                    : '新分类默认排在同级末尾，可手动调整数字'
+                }}
+              </div>
             </el-form-item>
             <el-form-item label="备注">
               <el-input
@@ -123,7 +151,9 @@
             >
             <span class="spacer"></span>
             <el-button @click="resetForm">清空</el-button>
-            <el-button type="primary" :icon="Check" @click="save">保存</el-button>
+            <el-button type="primary" :icon="Check" @click="save">{{
+              form.id ? '保存' : '创建'
+            }}</el-button>
           </div>
         </div>
       </div>
@@ -132,16 +162,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, watch, nextTick, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, Delete, ArrowLeft, Check, FolderOpened } from '@element-plus/icons-vue'
+import {
+  Plus,
+  Delete,
+  ArrowLeft,
+  ArrowUp,
+  ArrowDown,
+  Check,
+  FolderOpened
+} from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getCategories, createCategory, updateCategory, deleteCategory } from '../../api/category'
+import { getConclusions } from '../../api/conclusion'
 
 const router = useRouter()
 const tree = ref<any[]>([])
 const treeProps = { label: 'name', children: 'children' }
 const totalCount = ref(0)
+const treeRef = ref<any>(null)
+const nameInputRef = ref<any>(null)
 
 const form = reactive<any>({ id: null, name: '', parentId: null, sort: 0, remark: '' })
 
@@ -153,13 +194,28 @@ const countNodes = (nodes: any[]): number =>
 // 「上级分类」下拉的候选：仅允许二级嵌套，故父级只能是一级分类
 const topLevelCategories = computed(() => tree.value.filter((n) => n.parentId == null))
 
-// 当前表单对应的父分类名（新建/编辑子分类时提示所属）
-const parentName = computed(() => {
-  const pid = form.parentId === '' || form.parentId == null ? null : form.parentId
-  if (pid == null) return ''
-  const found = findNode(tree.value, pid)
-  return found ? found.name : ''
-})
+// 每个分类下的结论条数（pageSize=1 只取 total），帮助判断哪里有内容
+const counts = ref<Record<number, number>>({})
+const loadCounts = async () => {
+  const ids: number[] = []
+  const walk = (nodes: any[]) => {
+    for (const n of nodes) {
+      ids.push(n.id)
+      walk(n.children || [])
+    }
+  }
+  walk(tree.value)
+  const rows = await Promise.all(
+    ids.map((id) =>
+      getConclusions({ categoryId: id, page: 1, pageSize: 1 })
+        .then((r) => [id, r.total] as const)
+        .catch(() => [id, 0] as const)
+    )
+  )
+  const map: Record<number, number> = {}
+  for (const [id, total] of rows) map[id] = total
+  counts.value = map
+}
 
 const findNode = (nodes: any[], id: number): any => {
   for (const n of nodes) {
@@ -172,23 +228,71 @@ const findNode = (nodes: any[], id: number): any => {
   return null
 }
 
+// 当前表单对应的父分类名（新建/编辑子分类时提示所属）
+const parentName = computed(() => {
+  const pid = form.parentId === '' || form.parentId == null ? null : form.parentId
+  if (pid == null) return ''
+  const found = findNode(tree.value, pid)
+  return found ? found.name : ''
+})
+
+// 同级兄弟（以树中已保存的节点为准，而非表单里未保存的 parentId）
+const selectedNode = computed(() => (form.id ? findNode(tree.value, form.id) : null))
+const siblings = computed(() => {
+  const node = selectedNode.value
+  if (!node) return []
+  const pid = node.parentId ?? null
+  const pool = pid == null ? tree.value : findNode(tree.value, pid)?.children || []
+  return [...pool].sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0) || a.id - b.id)
+})
+const siblingIndex = computed(() => siblings.value.findIndex((s) => s.id === form.id))
+const canMoveUp = computed(() => form.id != null && siblingIndex.value > 0)
+const canMoveDown = computed(
+  () => form.id != null && siblingIndex.value >= 0 && siblingIndex.value < siblings.value.length - 1
+)
+
+// 新建模式下追加到同级末尾的默认排序值
+const nextSortFor = (pid: number | null) => {
+  const pool = pid == null ? tree.value : findNode(tree.value, pid)?.children || []
+  return pool.reduce((m, s) => Math.max(m, s.sort ?? 0), -1) + 1
+}
+// 新建过程中切换「上级分类」时，排序自动跟到目标层级的末尾
+watch(
+  () => form.parentId,
+  (pid) => {
+    if (form.id == null) form.sort = nextSortFor(pid == null || pid === '' ? null : Number(pid))
+  }
+)
+
+const focusName = () => nextTick(() => nameInputRef.value?.focus())
+const restoreCurrentKey = () => nextTick(() => treeRef.value?.setCurrentKey(form.id ?? null))
+
 const load = async () => {
   tree.value = await getCategories()
   totalCount.value = countNodes(tree.value)
+  await loadCounts()
+  restoreCurrentKey()
 }
 
 const resetForm = () => {
   form.id = null
   form.name = ''
   form.parentId = null
-  form.sort = 0
+  form.sort = nextSortFor(null)
   form.remark = ''
+  restoreCurrentKey()
+  focusName()
 }
 
 // 新建：parentId 可选（为空则新建一级分类）
 const openCreate = (parentId?: number) => {
-  resetForm()
+  form.id = null
+  form.name = ''
   form.parentId = parentId ?? null
+  form.remark = ''
+  form.sort = nextSortFor(parentId ?? null)
+  restoreCurrentKey()
+  focusName()
 }
 
 // 点击树节点 → 编辑
@@ -214,12 +318,36 @@ const save = async () => {
   if (form.id) {
     await updateCategory(form.id, payload)
     ElMessage.success('已保存')
+    await load()
   } else {
     await createCategory(payload)
-    ElMessage.success('已创建')
+    // 连续录入：保留「上级分类」，只清名称/备注，排序自动追加到同级末尾
+    ElMessage.success(`已创建「${payload.name}」，可继续录入`)
+    form.name = ''
+    form.remark = ''
+    form.sort = nextSortFor(payload.parentId)
+    await load()
+    focusName()
   }
+}
+
+// 上移/下移：与相邻同级交换后整层重排 sort（自动保存）
+const moveSelected = async (dir: -1 | 1) => {
+  if (!form.id) return
+  const list = siblings.value
+  const idx = list.findIndex((s) => s.id === form.id)
+  const to = idx + dir
+  if (to < 0 || to >= list.length) return
+  const reordered = [...list]
+  ;[reordered[idx], reordered[to]] = [reordered[to], reordered[idx]]
+  const updates = reordered
+    .map((s, i) => ({ id: s.id as number, sort: i, old: s.sort ?? 0 }))
+    .filter((u) => u.old !== u.sort)
+    .map((u) => updateCategory(u.id, { sort: u.sort }))
+  await Promise.all(updates)
+  form.sort = to
   await load()
-  resetForm()
+  ElMessage.success(dir === -1 ? '已上移' : '已下移')
 }
 
 const remove = (data: any) => doRemove(data.id)
@@ -388,6 +516,22 @@ onMounted(load)
   border-radius: 4px;
   padding: 2px 5px;
 }
+/* 分类下的结论条数：一眼看出哪里有内容 */
+.tree-node__count {
+  flex-shrink: 0;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--olive);
+  background: rgba(95, 111, 76, 0.09);
+  border-radius: 999px;
+  padding: 3px 7px;
+}
+.tree-node__count.is-zero {
+  color: var(--ink-soft);
+  background: transparent;
+  border: 1px dashed var(--line-strong);
+  padding: 2px 6px;
+}
 .tree-node__actions {
   flex-shrink: 0;
   display: none;
@@ -451,7 +595,17 @@ onMounted(load)
 /* —— 右侧：编辑表单 —— */
 .cat-form {
   flex: 1;
+  min-width: 0;
   padding: 4px 8px;
+}
+/* 大屏下表单不要拉满整行，收在舒适行宽内 */
+.cat-form :deep(.el-form) {
+  max-width: 640px;
+}
+.sort-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .cat-form__head {
   display: flex;
