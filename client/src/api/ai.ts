@@ -49,7 +49,7 @@ export const generateConclusionStream = async (
   data: AiConclusionPayload,
   handlers: ConclusionStreamHandlers = {},
   signal?: AbortSignal
-): Promise<{ text: string; truncated: boolean }> => {
+): Promise<{ text: string; truncated: boolean; interrupted: boolean }> => {
   const token = localStorage.getItem(TOKEN_KEY)
   const res = await fetch('/api/ai/conclusion/stream', {
     method: 'POST',
@@ -123,5 +123,10 @@ export const generateConclusionStream = async (
     }
   }
 
-  return { text: full, truncated }
+  // 流被提前关闭（后端异常结束 / 代理掐断）：一个字都没收到就直接报错，
+  // 有部分内容则交回调用方处理，避免用户对着转圈干等
+  if (!finished && !full.trim()) {
+    throw new Error('连接在返回内容前被中断，请重试；若反复出现请查看后端控制台日志')
+  }
+  return { text: full, truncated, interrupted: !finished }
 }

@@ -212,7 +212,7 @@ const generate = async () => {
   streamAbort = new AbortController()
   let lastPaint = 0
   try {
-    const { text, truncated } = await generateConclusionStream(
+    const { text, truncated, interrupted } = await generateConclusionStream(
       {
         title: props.title.trim(),
         intro: introText.value.trim() || undefined,
@@ -242,7 +242,17 @@ const generate = async () => {
       },
       streamAbort.signal
     )
-    finishWithText(text, truncated)
+    // 流被提前关闭：保留已收到的内容并明确告知「不完整」，别让用户以为已经生成成功
+    if (interrupted) {
+      if (text.trim()) {
+        finishWithText(text, truncated)
+        issueText.value = '连接被提前中断，以上是已收到的部分内容；建议重新生成'
+      } else {
+        throw new Error('连接在返回内容前被中断，请重试')
+      }
+    } else {
+      finishWithText(text, truncated)
+    }
   } catch (e: any) {
     const aborted = e?.name === 'AbortError'
     const partial = streamRaw.value.trim()

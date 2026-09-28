@@ -772,10 +772,14 @@ exports.generateConclusionStream = async (req, res) => {
   }, AI_STREAM_HEARTBEAT_MS)
 
   const abort = new AbortController()
-  let closed = false
-  req.on('close', () => {
-    closed = true
-    // 前端点了「停止」或关掉页面：立刻断开上游，别继续烧 token
+  let clientGone = false
+  // ⚠️ 这里绝不能监听 req 的 'close'：Node 16+ 里请求体被 express.json() 读完后 req 也会触发
+  // close，于是请求刚开始（实测 36ms）就被误判成「客户端断开」→ 中断上游又不结束响应，
+  // 前端表现为一直转圈、一个字都收不到（后端日志只留一行 CLIENT_CLOSED）。
+  // 正确做法：监听 res，只有「响应还没写完连接就断了」才算客户端主动断开（点停止/关页面）。
+  res.on('close', () => {
+    if (res.writableEnded) return
+    clientGone = true
     abort.abort()
   })
 
@@ -808,7 +812,8 @@ exports.generateConclusionStream = async (req, res) => {
         send({ type: 'thinking', chars })
       }
     })
-    if (closed) return
+    // 响应已经写过（或连接已断）就不要再写：判断依据用 res 自身状态，而不是自己的标记位
+    if (res.writableEnded) return
     if (!text.trim()) {
       // 只思考没正文的情况要单独提示，否则老师会以为是卡住了
       send({
@@ -825,8 +830,13 @@ exports.generateConclusionStream = async (req, res) => {
     send({ type: 'done', truncated })
     res.end()
   } catch (e) {
-    console.log(`[ai] 结论生成失败：用时 ${Date.now() - t0}ms，原因 ${e?.message || e}`)
-    if (closed) return
+    console.log(
+      `[ai] 结论生成失败：用时 ${Date.now() - t0}ms，原因 ${e?.message || e}` +
+        (clientGone ? '（客户端已断开）' : '')
+    )
+    // 前端点了停止/关了页面时连接确实没了，写不出去也无所谓；
+    // 但只要响应还没结束，就一定要把它结束掉，避免前端一直转圈等待
+    if (res.writableEnded) return
     send({ type: 'error', message: describeStreamError(e, target.base) })
     res.end()
   } finally {
