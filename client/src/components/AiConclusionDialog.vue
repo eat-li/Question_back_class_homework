@@ -37,6 +37,10 @@
       <el-button v-if="hasResult" text :icon="Refresh" :loading="loading" @click="generate"
         >换一版</el-button
       >
+      <el-button v-if="loading" text type="danger" @click="stopStreaming">停止生成</el-button>
+      <span v-if="loading" class="ac-stream-hint">
+        {{ streamChars ? `已接收 ${streamChars} 字` : '等待模型返回…' }} · {{ waitingSec }}s
+      </span>
     </div>
 
     <el-alert
@@ -49,7 +53,7 @@
     />
 
     <div v-loading="loading" class="ac-preview">
-      <div v-if="!hasResult && !loading" class="ac-empty">
+      <div v-if="!hasResult && !loading && !streamChars" class="ac-empty">
         <el-empty
           description="点击「生成内容」，AI 会据此标题写出这个结论的正文与要点（力求简洁；只有必要时才附一个最简示例）"
         />
@@ -59,7 +63,7 @@
 
     <template #footer>
       <el-button @click="close">取消</el-button>
-      <el-button type="primary" :icon="Check" :disabled="!hasResult" @click="apply"
+      <el-button type="primary" :icon="Check" :disabled="!hasResult || loading" @click="apply"
         >应用并替换</el-button
       >
     </template>
@@ -67,10 +71,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onBeforeUnmount, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Refresh, Check } from '@element-plus/icons-vue'
-import { generateConclusion } from '../api/ai'
+import { generateConclusionStream } from '../api/ai'
 import { resolveAiCreds } from '../utils/aiConfig'
 import { sanitizeRichHtml } from '../utils/sanitizeHtml'
 import { normalizeAiMathHtml, validateAiMath } from '../utils/aiMath'
@@ -98,6 +102,63 @@ const issueText = ref('')
 const failedCount = ref(0)
 
 const hasResult = computed(() => Boolean(rawHtml.value))
+// —— 流式状态 ——
+// streamChars / waitingSec 仅用于「已接收 N 字 · 已等待 Ns」的进度提示；
+// streamRaw 保存原始累积文本，中途停止或出错时还能把已收到的部分留下来用
+const streamChars = ref(0)
+const waitingSec = ref(0)
+const streamRaw = ref('')
+
+let streamAbort: AbortController | null = null
+let waitTimer: number | undefined
+
+// 预览用：还没闭合的 <!-- 会把它后面的内容一起吞掉（连正文都不显示），先剪掉尾巴上的半截注释。
+// 完整注释不用处理——RichContent 内部的消毒器会把注释节点去掉。
+const stripDanglingComment = (text: string) => {
+  const i = text.lastIndexOf('<!--')
+  return i >= 0 && text.indexOf('-->', i) < 0 ? text.slice(0, i) : text
+}
+
+const previewFromStream = (text: string) => sanitizeRichHtml(stripDanglingComment(text))
+
+// 生成结束后统一处理：公式规范化 → 提取 SUMMARY/TAGS 注释 → 消毒 → 公式校验
+const finishWithText = (raw: string, truncated: boolean) => {
+  const { html: normalized } = normalizeAiMathHtml(raw || '')
+  const sm = normalized.match(/<!--SUMMARY:(.*?)-->/i)
+  const tg = normalized.match(/<!--TAGS:(.*?)-->/i)
+  summary.value = sm ? sm[1].trim() : ''
+  tags.value = tg ? tg[1].trim() : ''
+  const cleaned = normalized
+    .replace(/<!--SUMMARY:.*?-->/gi, '')
+    .replace(/<!--TAGS:.*?-->/gi, '')
+    .trim()
+  const safe = sanitizeRichHtml(cleaned)
+  rawHtml.value = safe
+  previewHtml.value = safe // RichContent 内部还会再消毒并渲染公式
+  const v = validateAiMath(safe)
+  failedCount.value = v.failed.length
+  if (truncated) {
+    issueText.value = `内容可能被模型的长度上限截断（已收到 ${safe.length} 字），建议重新生成或手动补全`
+  } else if (v.total && v.failed.length) {
+    issueText.value =
+      `共 ${v.total} 处公式，其中 ${v.failed.length} 处未能渲染：` +
+      v.failed
+        .slice(0, 3)
+        .map((f) => f.content)
+        .join(' ｜ ')
+  } else if (v.total === 0) {
+    issueText.value = '生成完成（未检测到 $ 公式）'
+  } else {
+    issueText.value = `生成完成，共 ${v.total} 处公式均能正常渲染`
+  }
+}
+
+const stopStreaming = () => streamAbort?.abort()
+
+const clearWaitTimer = () => {
+  window.clearInterval(waitTimer)
+  waitTimer = undefined
+}
 
 const generate = async () => {
   if (!props.title?.trim()) {
@@ -119,54 +180,79 @@ const generate = async () => {
     return
   }
 
+  // 重新生成时先清空上一轮结果，避免「边生成边显示旧内容」造成误判
   loading.value = true
   issueText.value = ''
+  failedCount.value = 0
+  rawHtml.value = ''
+  previewHtml.value = ''
+  summary.value = ''
+  tags.value = ''
+  streamRaw.value = ''
+  streamChars.value = 0
+  waitingSec.value = 0
+
+  const startedAt = Date.now()
+  clearWaitTimer()
+  waitTimer = window.setInterval(() => {
+    waitingSec.value = Math.round((Date.now() - startedAt) / 1000)
+  }, 500)
+
+  streamAbort = new AbortController()
+  let lastPaint = 0
   try {
-    const { html } = await generateConclusion({
-      title: props.title.trim(),
-      intro: introText.value.trim() || undefined,
-      categoryName: props.categoryName,
-      ...creds
-    })
-    // 1) 本地公式规范化（Unicode→LaTeX、定界符归一化）
-    const { html: normalized } = normalizeAiMathHtml(html || '')
-    // 2) 提取 SUMMARY / TAGS 注释（模型按约定放在 HTML 最前）
-    const sm = normalized.match(/<!--SUMMARY:(.*?)-->/i)
-    const tg = normalized.match(/<!--TAGS:(.*?)-->/i)
-    summary.value = sm ? sm[1].trim() : ''
-    tags.value = tg ? tg[1].trim() : ''
-    // 3) 去掉注释节点，得到干净内容
-    const cleaned = normalized
-      .replace(/<!--SUMMARY:.*?-->/gi, '')
-      .replace(/<!--TAGS:.*?-->/gi, '')
-      .trim()
-    const safe = sanitizeRichHtml(cleaned)
-    rawHtml.value = safe
-    previewHtml.value = safe // RichContent 内部会做 sanitize + renderMath
-    // 4) 公式校验
-    const v = validateAiMath(safe)
-    failedCount.value = v.failed.length
-    if (v.total && v.failed.length) {
-      issueText.value =
-        `共 ${v.total} 处公式，其中 ${v.failed.length} 处未能渲染：` +
-        v.failed
-          .slice(0, 3)
-          .map((f) => f.content)
-          .join(' ｜ ')
-    } else if (v.total === 0) {
-      issueText.value = '生成完成（未检测到 $ 公式）'
-    } else {
-      issueText.value = `生成完成，共 ${v.total} 处公式均能正常渲染`
-    }
+    const { text, truncated } = await generateConclusionStream(
+      {
+        title: props.title.trim(),
+        intro: introText.value.trim() || undefined,
+        categoryName: props.categoryName,
+        ...creds
+      },
+      {
+        // 分片到达：累积原文，并按 200ms 节流刷新预览（避免每个字都重排一次公式）
+        onDelta: (_piece, full) => {
+          streamRaw.value = full
+          streamChars.value = full.length
+          const now = Date.now()
+          if (now - lastPaint > 200) {
+            lastPaint = now
+            previewHtml.value = previewFromStream(full)
+          }
+        }
+      },
+      streamAbort.signal
+    )
+    finishWithText(text, truncated)
   } catch (e: any) {
-    const isTimeout = e?.code === 'ECONNABORTED' || /超时/.test(e?.message || '')
-    ElMessageBox.alert(
-      isTimeout ? 'AI 接口响应较慢或暂时不可用，请稍后重试。' : '生成失败，请稍后重试。',
-      isTimeout ? 'AI 生成超时' : 'AI 生成失败',
-      { confirmButtonText: '知道了', type: isTimeout ? 'warning' : 'error' }
-    ).catch(() => {})
+    const aborted = e?.name === 'AbortError'
+    const partial = streamRaw.value.trim()
+    if (aborted) {
+      // 主动停止：已收到的部分直接可用，不白等一场
+      if (partial) {
+        finishWithText(streamRaw.value, false)
+        issueText.value = '已停止生成，保留了已收到的部分内容；可直接「应用并替换」或重新生成'
+      } else {
+        issueText.value = '已停止生成'
+      }
+    } else if (partial) {
+      finishWithText(streamRaw.value, false)
+      ElMessageBox.alert(
+        `${e?.message || '生成中断'}。已保留收到的部分内容，可直接应用或重新生成。`,
+        'AI 生成中断',
+        { confirmButtonText: '知道了', type: 'warning' }
+      ).catch(() => {})
+    } else {
+      // 没有内容时把后端给出的真实原因显示出来（限流 / 地址不通 / 模型报错），
+      // 不再统一含糊成「生成失败，请稍后重试」
+      ElMessageBox.alert(e?.message || '生成失败，请稍后重试。', 'AI 生成失败', {
+        confirmButtonText: '知道了',
+        type: 'error'
+      }).catch(() => {})
+    }
   } finally {
+    clearWaitTimer()
     loading.value = false
+    streamAbort = null
   }
 }
 
@@ -179,6 +265,18 @@ const apply = () => {
 }
 
 const close = () => emit('update:modelValue', false)
+
+// 关闭对话框 / 组件卸载时中断流式请求，避免后端继续消耗 token
+watch(
+  () => props.modelValue,
+  (v) => {
+    if (!v) stopStreaming()
+  }
+)
+onBeforeUnmount(() => {
+  stopStreaming()
+  clearWaitTimer()
+})
 </script>
 
 <style scoped>
@@ -208,6 +306,7 @@ const close = () => emit('update:modelValue', false)
   white-space: nowrap;
 }
 .ac-actions {
+  align-items: center;
   display: flex;
   gap: 8px;
   margin-bottom: 4px;
@@ -226,5 +325,11 @@ const close = () => emit('update:modelValue', false)
   align-items: center;
   justify-content: center;
   min-height: 180px;
+}
+.ac-stream-hint {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
 }
 </style>

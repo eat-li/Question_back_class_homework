@@ -1,4 +1,4 @@
-import request from './request'
+import request, { TOKEN_KEY } from './request'
 import type {
   AiConfig,
   AiFormatPayload,
@@ -28,6 +28,92 @@ export const generateLessonSummary = (
   data: AiLessonSummaryPayload
 ): Promise<AiLessonSummaryResult> => request.post('/ai/lesson-summary', data, { timeout: 120000 })
 
-// AI 结论生成：从「标题 + 简介 + 分类」产出结构化完整内容（讲解/示例/要点 + 摘要/标签注释）
+// AI 结论生成：从「标题 + 简介 + 分类」产出该结论的具体内容（正文 + 要点 + 摘要/标签注释）
 export const generateConclusion = (data: AiConclusionPayload): Promise<AiConclusionResult> =>
   request.post('/ai/conclusion', data, { timeout: 120000 })
+
+// —— 结论生成（流式 / SSE）——
+// 为什么不用 axios：axios 拿不到分片，只能等整个响应结束，一旦超过 2 分钟就整体失败。
+// 这里用 fetch + ReadableStream 边收边渲染，并把「总时长超时」换成后端的「空闲超时」，
+// 慢模型、长内容也不会再因为总耗时被判失败。
+export interface ConclusionStreamHandlers {
+  // piece：本次增量文本；full：到目前为止的完整文本
+  onDelta?: (piece: string, full: string) => void
+}
+
+export const generateConclusionStream = async (
+  data: AiConclusionPayload,
+  handlers: ConclusionStreamHandlers = {},
+  signal?: AbortSignal
+): Promise<{ text: string; truncated: boolean }> => {
+  const token = localStorage.getItem(TOKEN_KEY)
+  const res = await fetch('/api/ai/conclusion/stream', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify(data),
+    signal
+  })
+
+  // 参数/鉴权类问题发生在进入流式之前，仍是普通 JSON 包络：把 message 原样带出来
+  const isStream = String(res.headers.get('content-type') || '').includes('text/event-stream')
+  if (!res.ok || !res.body || !isStream) {
+    const raw = await res.text().catch(() => '')
+    let message = `AI 流式接口不可用（HTTP ${res.status}）`
+    try {
+      const parsed = JSON.parse(raw)
+      if (parsed?.message) message = parsed.message
+    } catch {
+      /* 保留默认文案 */
+    }
+    throw new Error(message)
+  }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let full = ''
+  let truncated = false
+  let finished = false
+
+  while (!finished) {
+    const chunk = await reader.read()
+    if (chunk.done) break
+    buffer += decoder.decode(chunk.value, { stream: true })
+
+    let sep
+    while ((sep = buffer.indexOf('\n\n')) >= 0) {
+      const block = buffer.slice(0, sep)
+      buffer = buffer.slice(sep + 2)
+      for (const rawLine of block.split('\n')) {
+        const line = rawLine.trim()
+        if (!line.startsWith('data:')) continue // 跳过 : ping 心跳行
+        const payload = line.slice(5).trim()
+        if (!payload) continue
+        let evt: any
+        try {
+          evt = JSON.parse(payload)
+        } catch {
+          continue
+        }
+        if (evt.type === 'delta') {
+          const piece = String(evt.text || '')
+          if (piece) {
+            full += piece
+            handlers.onDelta?.(piece, full)
+          }
+        } else if (evt.type === 'error') {
+          // 后端已把上游原文/超时原因翻译成人话，直接抛出去给对话框展示
+          throw new Error(evt.message || '生成失败，请稍后重试')
+        } else if (evt.type === 'done') {
+          truncated = Boolean(evt.truncated)
+          finished = true
+        }
+      }
+    }
+  }
+
+  return { text: full, truncated }
+}

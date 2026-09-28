@@ -55,6 +55,14 @@ const BUILTIN_ALLOWED_BASE_URLS = ['https://api.deepseek.com/v1', 'https://api.o
 // AI 接口调用超时（毫秒）：大模型生成较慢，给足时间
 const AI_TIMEOUT_MS = 120000
 
+// 流式（SSE）超时：不再限制「总时长」，只限制「多久没收到任何数据」——
+// 模型一边生成一边回传，只要不断流就不会被判超时，慢模型也不会整段失败。
+const AI_STREAM_IDLE_MS = Number(process.env.AI_STREAM_IDLE_MS) || 60000
+// 单次流式生成的硬上限，防止异常连接永不结束
+const AI_STREAM_MAX_MS = Number(process.env.AI_STREAM_MAX_MS) || 10 * 60 * 1000
+// 心跳间隔：SSE 空闲时补发注释行，避免被代理/网关按空闲超时掐断
+const AI_STREAM_HEARTBEAT_MS = 15000
+
 /* ===================== 地址白名单 ===================== */
 
 function normalizeBaseUrl(raw) {
@@ -179,6 +187,155 @@ async function callChat({ key, base, model, messages, temperature = 0.2, maxToke
 
   const data = await resp.json()
   return String(data?.choices?.[0]?.message?.content || '')
+}
+
+/* ===================== 流式调用（SSE） ===================== */
+
+// 调用上游 /chat/completions 并开启 stream:true，逐段回调 onDelta。
+// 返回 { text, truncated }：text 是拼接后的完整文本，truncated 表示被 max_tokens 截断。
+async function streamChat({
+  key,
+  base,
+  model,
+  messages,
+  temperature = 0.2,
+  maxTokens = 4096,
+  onDelta,
+  signal
+}) {
+  const controller = new AbortController()
+  let idleTimer = null
+  let abortReason = '' // '' | IDLE | MAX_DURATION | CLIENT_CLOSED
+  const abortWith = (reason) => {
+    if (!abortReason) abortReason = reason
+    controller.abort()
+  }
+  const resetIdle = () => {
+    clearTimeout(idleTimer)
+    idleTimer = setTimeout(() => abortWith('IDLE'), AI_STREAM_IDLE_MS)
+  }
+  const hardTimer = setTimeout(() => abortWith('MAX_DURATION'), AI_STREAM_MAX_MS)
+  const onOuterAbort = () => abortWith('CLIENT_CLOSED')
+  if (signal) {
+    if (signal.aborted) onOuterAbort()
+    else signal.addEventListener('abort', onOuterAbort)
+  }
+
+  let text = ''
+  let truncated = false
+  try {
+    resetIdle()
+    const resp = await fetch(`${base}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${key}`
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature,
+        max_tokens: maxTokens,
+        stream: true
+      }),
+      signal: controller.signal
+    })
+
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => '')
+      let msg = `AI 接口返回错误（HTTP ${resp.status}）`
+      try {
+        const j = JSON.parse(errText)
+        if (j?.error?.message) msg = j.error.message
+      } catch {
+        if (errText) msg = errText.slice(0, 200)
+      }
+      const err = new Error(msg)
+      err.httpStatus = 50200
+      err.upstreamStatus = resp.status
+      throw err
+    }
+    if (!resp.body) {
+      const err = new Error('AI 接口没有返回流式内容（该服务可能不支持 stream）')
+      err.httpStatus = 50200
+      throw err
+    }
+
+    const reader = resp.body.getReader()
+    const decoder = new TextDecoder()
+    let buf = ''
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      // 只要有分片到达就续期：模型「思考」阶段或吐字很慢也不会被误判为超时
+      resetIdle()
+      buf += decoder.decode(value, { stream: true })
+
+      let nl
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl).trim()
+        buf = buf.slice(nl + 1)
+        if (!line || line.startsWith(':')) continue // 心跳 / 注释行
+        if (!line.startsWith('data:')) continue
+        const payload = line.slice(5).trim()
+        if (!payload || payload === '[DONE]') continue
+        let json
+        try {
+          json = JSON.parse(payload)
+        } catch {
+          continue // 上游偶发非 JSON 分片：跳过，不让整段失败
+        }
+        if (json?.error) {
+          const err = new Error(json.error.message || 'AI 接口返回错误')
+          err.httpStatus = 50200
+          throw err
+        }
+        const choice = json?.choices?.[0]
+        const piece = String(choice?.delta?.content || '')
+        if (piece) {
+          text += piece
+          onDelta?.(piece)
+        }
+        if (choice?.finish_reason === 'length') truncated = true
+      }
+    }
+    return { text, truncated }
+  } catch (e) {
+    // 上游真实报错原样抛出；中止类错误统一成带 streamAbort 标记的错误，供文案映射
+    if (e?.httpStatus) throw e
+    if (abortReason || e?.name === 'AbortError') {
+      const reason = abortReason || 'CLIENT_CLOSED'
+      const err = new Error(reason)
+      err.streamAbort = reason
+      throw err
+    }
+    throw e
+  } finally {
+    clearTimeout(idleTimer)
+    clearTimeout(hardTimer)
+    if (signal) signal.removeEventListener('abort', onOuterAbort)
+  }
+}
+
+// 流式路径的报错文案（此时响应头已发出，不能再走统一 JSON 包络）
+function describeStreamError(e, targetBase) {
+  if (e?.streamAbort === 'IDLE') {
+    return (
+      `AI 超过 ${Math.round(AI_STREAM_IDLE_MS / 1000)} 秒没有返回任何内容，已中断。` +
+      `可以重试、换个模型，或在 server/.env 调大 AI_STREAM_IDLE_MS`
+    )
+  }
+  if (e?.streamAbort === 'MAX_DURATION') return '本次生成时间过长，已中断；可重试或换用更快的模型'
+  if (e?.streamAbort === 'CLIENT_CLOSED') return '已停止生成'
+  if (e?.httpStatus) return e.message
+  if (e?.cause || e?.code) {
+    const detail = e?.cause?.code || e?.cause?.message || e?.code || '网络错误'
+    return (
+      `无法连接 AI 接口（${detail}）：${targetBase || '（地址为空）'}。` +
+      `请检查接口地址是否正确、能否从本机访问，以及该服务是否可用`
+    )
+  }
+  return e?.message || '生成失败，请稍后重试'
 }
 
 // 统一的错误应答：超时 / 接口报错 / 网络层失败 / 其它
@@ -511,7 +668,20 @@ exports.lessonSummary = async (req, res, next) => {
   }
 }
 
-// 结论自动生成：从「标题 + 简介 + 分类」产出结构化完整内容（讲解/示例/要点）。
+// 结论生成的用户消息（普通与流式共用，避免两处写法不一致）
+function buildConclusionUserContent({ title, intro, categoryName }) {
+  return [
+    `结论标题：${String(title || '').trim()}`,
+    `所属分类：${categoryName ? String(categoryName) : '（未指定）'}`,
+    intro && String(intro).trim() ? `简要说明：${String(intro).trim()}` : '',
+    '',
+    '请用最少的话把这个结论本身讲清楚，只写它的具体内容。'
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+// 结论自动生成：从「标题 + 简介 + 分类」产出该结论的具体内容（正文 + 要点）。
 // 与排版/解题不同——结论本身就是要生成的内容，因此不调用 stripUnrequestedAnswer。
 // 模型在 HTML 前置 <!--SUMMARY:--> / <!--TAGS:--> 注释，前端解析后填入摘要与标签字段。
 exports.generateConclusion = async (req, res, next) => {
@@ -524,22 +694,12 @@ exports.generateConclusion = async (req, res, next) => {
     if (target.error) return fail(res, 40000, target.error)
     targetBase = target.base
 
-    const userContent = [
-      `结论标题：${String(title).trim()}`,
-      `所属分类：${categoryName ? String(categoryName) : '（未指定）'}`,
-      intro && String(intro).trim() ? `简要说明：${String(intro).trim()}` : '',
-      '',
-      '请用最少的话把这个结论本身讲清楚，只写它的具体内容。'
-    ]
-      .filter(Boolean)
-      .join('\n')
-
     const raw = await callChat({
       ...target,
       temperature: 0.3,
       messages: [
         { role: 'system', content: CONCLUSION_PROMPT },
-        { role: 'user', content: userContent }
+        { role: 'user', content: buildConclusionUserContent({ title, intro, categoryName }) }
       ]
     })
     const html = cleanAiHtml(raw)
@@ -548,5 +708,75 @@ exports.generateConclusion = async (req, res, next) => {
     ok(res, { html }, '生成完成')
   } catch (e) {
     replyAiError(res, next, e, targetBase)
+  }
+}
+
+// 结论生成（流式 / SSE）：边生成边回传，解决「长时间没有响应 → 整体超时 → 生成失败」。
+// 事件格式（每行 data: 后跟一个 JSON）：
+//   { type: 'delta', text: '…' }        增量文本
+//   { type: 'done', truncated: false }  正常结束（truncated=true 表示被 max_tokens 截断）
+//   { type: 'error', message: '…' }     失败（HTTP 状态仍是 200，原因在事件体里）
+exports.generateConclusionStream = async (req, res) => {
+  const { title, intro, categoryName, apiKey, baseUrl, model } = req.body || {}
+  if (!title || !String(title).trim()) return fail(res, 40000, '请先填写结论标题')
+  const target = resolveAiTarget({ apiKey, baseUrl, model })
+  if (target.error) return fail(res, 40000, target.error)
+
+  res.status(200).set({
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    // nginx 等反代默认缓冲响应体，显式关掉才能保证分片实时到达
+    'X-Accel-Buffering': 'no'
+  })
+  if (typeof res.flushHeaders === 'function') res.flushHeaders()
+
+  const send = (obj) => {
+    try {
+      res.write(`data: ${JSON.stringify(obj)}\n\n`)
+    } catch {
+      /* 连接已断开，忽略 */
+    }
+  }
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(': ping\n\n')
+    } catch {
+      /* 同上 */
+    }
+  }, AI_STREAM_HEARTBEAT_MS)
+
+  const abort = new AbortController()
+  let closed = false
+  req.on('close', () => {
+    closed = true
+    // 前端点了「停止」或关掉页面：立刻断开上游，别继续烧 token
+    abort.abort()
+  })
+
+  try {
+    const { text, truncated } = await streamChat({
+      ...target,
+      temperature: 0.3,
+      messages: [
+        { role: 'system', content: CONCLUSION_PROMPT },
+        { role: 'user', content: buildConclusionUserContent({ title, intro, categoryName }) }
+      ],
+      signal: abort.signal,
+      onDelta: (piece) => send({ type: 'delta', text: piece })
+    })
+    if (closed) return
+    if (!text.trim()) {
+      send({ type: 'error', message: 'AI 没有返回内容，请重试或换个模型' })
+      return res.end()
+    }
+    send({ type: 'done', truncated })
+    res.end()
+  } catch (e) {
+    if (closed) return
+    send({ type: 'error', message: describeStreamError(e, target.base) })
+    res.end()
+  } finally {
+    clearInterval(heartbeat)
   }
 }

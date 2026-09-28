@@ -23,7 +23,9 @@ module.exports = [
         __dirname: 'readonly',
         URL: 'readonly',
         fetch: 'readonly',
-        AbortController: 'readonly'
+        AbortController: 'readonly',
+        // 流式（SSE）解析上游分片时用到：Node 11+ 提供的全局 TextDecoder
+        TextDecoder: 'readonly'
       }
     },
     rules: {
