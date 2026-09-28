@@ -13,6 +13,7 @@ const KnowledgeCategory = require('./KnowledgeCategory')(sequelize, DataTypes)
 const Conclusion = require('./Conclusion')(sequelize, DataTypes)
 const LessonSummary = require('./LessonSummary')(sequelize, DataTypes)
 const Handout = require('./Handout')(sequelize, DataTypes)
+const KnowledgeSubLevel = require('./KnowledgeSubLevel')(sequelize, DataTypes)
 
 // 学生 1—* 提交
 Student.hasMany(Submission, { foreignKey: 'studentId' })
@@ -66,5 +67,6 @@ module.exports = {
   KnowledgeCategory,
   Conclusion,
   LessonSummary,
-  Handout
+  Handout,
+  KnowledgeSubLevel
 }

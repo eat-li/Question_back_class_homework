@@ -1,8 +1,34 @@
 // 题库控制器
 const { Op } = require('sequelize')
-const { sequelize, Question, HomeworkQuestion } = require('../models')
+const { sequelize, Question, HomeworkQuestion, KnowledgeSubLevel } = require('../models')
 const { ok, fail } = require('../utils/response')
 const { cacheGet, cacheSet, cacheDel } = require('../utils/cache')
+
+// 二级知识点的掌握等级：基础 / 中等 / 进阶
+const SUB_LEVELS = ['basic', 'medium', 'advanced']
+
+// 等级记录用 (一级知识点, 二级知识点名) 作键；未分类题库统一用空串（与 '__empty__' 等价）
+const tagKeyOf = (knowledgeTag) =>
+  knowledgeTag == null || knowledgeTag === '__empty__' ? '' : String(knowledgeTag).trim()
+
+// 二级知识点改名 / 合并 / 移动 / 删除时，把等级记录一起搬过去，
+// 否则会出现「名字改了，颜色没了」和永久的孤儿记录。
+// allTags：调用方没限定一级知识点（跨题库操作），此时逐条按各自所属题库迁移。
+async function syncSubLevelOnUpdate({ fromTag, fromName, toTag, toName, allTags }) {
+  const where = allTags ? { name: fromName } : { tag: fromTag, name: fromName }
+  const rows = await KnowledgeSubLevel.findAll({ where })
+  if (!rows.length) return
+  if (!toName) return KnowledgeSubLevel.destroy({ where }) // 二级知识点被删除（题目移回未分类）
+  for (const row of rows) {
+    const destTag = allTags ? row.tag : toTag
+    // 只是更换所属一级知识点：名称没变、等级原地不动
+    if (destTag === row.tag && toName === row.name) continue
+    const target = await KnowledgeSubLevel.findOne({ where: { tag: destTag, name: toName } })
+    // 合并到已有二级知识点时以对方的等级为准；对方没设过等级则继承来源的
+    if (target) await row.destroy()
+    else await row.update({ tag: destTag, name: toName })
+  }
+}
 
 // 知识点标签变化不频繁，加短 TTL 缓存
 const TAGS_TTL = 10000
@@ -180,7 +206,47 @@ exports.subTags = async (req, res, next) => {
       raw: true
     })
     const subs = rows.map((r) => ({ name: r.knowledgeSubTag, total: Number(r.count) || 0 }))
+    // 附上掌握等级（基础/中等/进阶），前端据此给二级知识点上色区分；没设过等级的为 null
+    if (subs.length) {
+      const levelRows = await KnowledgeSubLevel.findAll({
+        where: { tag: tagKeyOf(knowledgeTag) },
+        raw: true
+      })
+      const levelMap = new Map(levelRows.map((r) => [r.name, r.level]))
+      for (const s of subs) s.level = levelMap.get(s.name) || null
+    }
     ok(res, subs)
+  } catch (e) {
+    next(e)
+  }
+}
+
+// 设置二级知识点的掌握等级：body { knowledgeTag, name, level }
+// level 传空（null / ''）表示取消等级；前端侧栏的小圆点下拉就是调这个接口
+exports.setSubLevel = async (req, res, next) => {
+  try {
+    const { knowledgeTag, name, level } = req.body || {}
+    const subName = name == null ? '' : String(name).trim()
+    if (!subName) return fail(res, 40000, '二级知识点名称不能为空')
+    if (subName.length > 100) return fail(res, 40000, '二级知识点名称不能超过 100 字')
+
+    const nextLevel = level == null || level === '' ? null : String(level)
+    if (nextLevel && !SUB_LEVELS.includes(nextLevel)) {
+      return fail(res, 40000, '等级只能是 basic（基础）/ medium（中等）/ advanced（进阶）')
+    }
+
+    const tag = tagKeyOf(knowledgeTag)
+    const where = { tag, name: subName }
+    if (!nextLevel) {
+      await KnowledgeSubLevel.destroy({ where })
+      return ok(res, { name: subName, level: null }, '已取消等级')
+    }
+    const [row] = await KnowledgeSubLevel.findOrCreate({
+      where,
+      defaults: { level: nextLevel }
+    })
+    if (row.level !== nextLevel) await row.update({ level: nextLevel })
+    ok(res, { name: subName, level: nextLevel }, '等级已更新')
   } catch (e) {
     next(e)
   }
@@ -356,6 +422,14 @@ exports.updateSubTag = async (req, res, next) => {
     if (moveParent) payload.knowledgeTag = parentName || null
 
     await Question.update(payload, { where })
+    // 等级记录跟着二级知识点走：改名/合并/移动/删除都不能让它变成孤儿
+    await syncSubLevelOnUpdate({
+      fromTag: tagKeyOf(knowledgeTag),
+      fromName,
+      toTag: tagKeyOf(moveParent ? parentName : knowledgeTag),
+      toName: renameSub ? toName : fromName,
+      allTags: knowledgeTag == null || String(knowledgeTag) === ''
+    })
     cacheDel('questions:tags')
     cacheDel('stats:overview')
 

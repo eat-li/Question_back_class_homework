@@ -28,7 +28,9 @@
         <el-option v-for="n in 5" :key="n" :label="`${n} 星`" :value="n" />
       </el-select>
       <div class="filters__actions">
-        <el-button type="primary" :icon="Download" @click="exportVisible = true">导出 PDF</el-button>
+        <el-button type="primary" :icon="Download" @click="exportVisible = true"
+          >导出 PDF</el-button
+        >
       </div>
     </div>
 
@@ -45,6 +47,7 @@
 
         <ul class="ksubs">
           <li class="ksubs__item" :class="{ 'is-active': subTag === '' }" @click="selectSubTag('')">
+            <i class="ksubs__lv is-placeholder" />
             <span class="ksubs__name">全部</span>
             <span class="ksubs__count">{{ allCount }}</span>
           </li>
@@ -58,8 +61,39 @@
             @dragover.prevent
             @drop.prevent="onDropTo(s.name)"
           >
+            <!-- 掌握等级：圆点颜色即等级，点圆点可直接改 -->
+            <el-dropdown
+              class="ksubs__lvdrop"
+              trigger="click"
+              placement="bottom-start"
+              @click.stop
+              @command="(lv: string) => onSetLevel(s, lv)"
+            >
+              <i
+                class="ksubs__lv"
+                :class="s.level ? `is-${s.level}` : 'is-none'"
+                :style="levelDotStyle(s.level)"
+                :title="`掌握等级：${levelLabel(s.level)}（点击选择 基础 / 中等 / 进阶）`"
+              />
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item
+                    v-for="lv in KNOWLEDGE_LEVELS"
+                    :key="lv.value"
+                    :command="lv.value"
+                  >
+                    <i class="lvdot" :style="{ background: lv.color }" />{{ lv.label }}
+                  </el-dropdown-item>
+                  <el-dropdown-item divided command="__clear__">取消等级</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
             <span class="ksubs__name">{{ s.name }}</span>
-            <span class="ksubs__count">{{ s.total }}</span>
+            <span
+              class="ksubs__count"
+              :style="s.level ? { color: levelColor(s.level) } : undefined"
+              >{{ s.total }}</span
+            >
             <span
               class="ksubs__edit"
               title="编辑该二级知识点（重命名 / 合并 / 删除）"
@@ -76,6 +110,7 @@
             @dragover.prevent
             @drop.prevent="onDropTo(null)"
           >
+            <i class="ksubs__lv is-placeholder" />
             <span class="ksubs__name">未分类</span>
             <span class="ksubs__count">{{ emptyCount }}</span>
           </li>
@@ -84,6 +119,12 @@
         <p v-if="!subTags.length" class="kside__hint">
           还没有二级知识点——在题目卡片右上角的下拉框里直接输入名称即可新建。
         </p>
+        <!-- 等级图例：一眼看懂圆点颜色 -->
+        <div v-if="subTags.length" class="kside__legend">
+          <span v-for="lv in KNOWLEDGE_LEVELS" :key="lv.value" class="kside__legend-item">
+            <i class="lvdot" :style="{ background: lv.color }" />{{ lv.label }}
+          </span>
+        </div>
       </aside>
 
       <!-- 右栏：题目卡片列表，题干完整、选项齐全 -->
@@ -125,7 +166,9 @@
                 <el-option v-for="s in subTags" :key="s.name" :label="s.name" :value="s.name" />
               </el-select>
               <el-button size="small" :icon="Edit" @click="openEdit(q)">编辑</el-button>
-              <el-button size="small" type="danger" :icon="Delete" @click="remove(q)">删除</el-button>
+              <el-button size="small" type="danger" :icon="Delete" @click="remove(q)"
+                >删除</el-button
+              >
             </template>
           </QuestionCard>
         </div>
@@ -165,6 +208,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getQuestions,
   getQuestionSubTags,
+  setQuestionSubLevel,
   updateQuestion,
   deleteQuestion,
   renameQuestionTag
@@ -175,6 +219,12 @@ import SubTagEditDialog from '../../components/SubTagEditDialog.vue'
 import QuestionCard from '../../components/QuestionCard.vue'
 import QuestionExportDialog from '../../components/QuestionExportDialog.vue'
 import type { Question } from '../../types'
+import {
+  KNOWLEDGE_LEVELS,
+  knowledgeLevelLabel,
+  knowledgeLevelMeta
+} from '../../utils/knowledgeLevel'
+import type { KnowledgeLevel } from '../../utils/knowledgeLevel'
 
 const route = useRoute()
 const router = useRouter()
@@ -195,7 +245,7 @@ const editing = ref<any>(null)
 
 // —— 二级知识点筛选 ——
 const subTag = ref('')
-const subTags = ref<{ name: string; total: number }[]>([])
+const subTags = ref<{ name: string; total: number; level?: KnowledgeLevel | null }[]>([])
 // 未归类题量：subtags 接口只返回有值的二级，未分类要单独取一次
 const emptyCount = ref(0)
 // 「全部」= 各二级之和 + 未分类，正好覆盖该一级知识点下的所有题
@@ -224,6 +274,34 @@ const openSubEdit = (s: { name: string; total: number }) => {
 }
 
 // 编辑完成后刷新列表与二级候选；若当前正在筛选的二级被改名/删除，跟随切换到新名称
+
+// —— 二级知识点掌握等级（基础 / 中等 / 进阶）——
+// 圆点颜色即等级，点圆点即可直接修改；没定级的显示空心圆点
+const levelLabel = (lv?: string | null) => knowledgeLevelLabel(lv)
+const levelColor = (lv?: string | null) => knowledgeLevelMeta(lv)?.color || 'transparent'
+const levelDotStyle = (lv?: string | null) => {
+  const meta = knowledgeLevelMeta(lv)
+  return meta ? { background: meta.color, boxShadow: `0 0 0 3px ${meta.soft}` } : undefined
+}
+
+// 设置 / 取消等级：先本地变色（即时反馈），失败再回滚，避免整表刷新
+const onSetLevel = async (item: { name: string; level?: KnowledgeLevel | null }, level: string) => {
+  const next = level === '__clear__' ? null : (level as KnowledgeLevel)
+  if ((item.level || null) === next) return
+  const prev = item.level || null
+  item.level = next
+  try {
+    await setQuestionSubLevel({ knowledgeTag: tag.value, name: item.name, level: next })
+    ElMessage.success(
+      next
+        ? `已将「${item.name}」标记为${knowledgeLevelLabel(next)}`
+        : `已取消「${item.name}」的等级`
+    )
+  } catch {
+    item.level = prev // 失败回滚；错误提示由 request.ts 统一弹出
+  }
+}
+
 const onSubTagSaved = async (payload?: { name?: string }) => {
   const oldName = subEditTarget.value.name
   await Promise.all([loadSubTags(), load()])
@@ -460,7 +538,7 @@ watch(
 }
 .kside {
   flex-shrink: 0;
-  width: 218px;
+  width: 246px;
   /*
    * 侧栏钉住，不随题目列表上下滚。
    * 前提：祖先里不能有「非 visible 的 overflow」，否则那个祖先会成为最近的滚动容器，
@@ -665,5 +743,54 @@ watch(
   .sub-pick {
     width: 120px;
   }
+}
+/* —— 二级知识点掌握等级：圆点 + 图例 —— */
+.ksubs__lvdrop {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.ksubs__lv {
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: transform var(--dur) var(--ease);
+}
+.ksubs__lv:hover {
+  transform: scale(1.35);
+}
+.ksubs__lv.is-none {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.ksubs__lv.is-placeholder {
+  visibility: hidden;
+  cursor: default;
+}
+.lvdot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+.kside__legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 8px 2px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--hair);
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+.kside__legend-item {
+  display: inline-flex;
+  align-items: center;
 }
 </style>

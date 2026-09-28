@@ -41,12 +41,24 @@ export const getAllQuestions = async (params: QuestionQuery = {}): Promise<Quest
 export const getQuestionStats = (params?: { keyword?: string }): Promise<QuestionStats[]> =>
   request.get('/questions/stats', { params })
 export const getQuestionTags = (): Promise<string[]> => request.get('/questions/tags')
-export const getQuestionSubTags = (
-  knowledgeTag?: string
-): Promise<{ name: string; total: number }[]> =>
+// 二级知识点（含掌握等级：基础/中等/进阶；null 表示还没定级）
+export interface QuestionSubTag {
+  name: string
+  total: number
+  level?: 'basic' | 'medium' | 'advanced' | null
+}
+export const getQuestionSubTags = (knowledgeTag?: string): Promise<QuestionSubTag[]> =>
   request.get('/questions/subtags', { params: knowledgeTag ? { knowledgeTag } : undefined })
 export const renameQuestionTag = (from: string, to: string): Promise<{ updated: number }> =>
   request.patch('/questions/rename-tag', { from, to })
+
+/** 设置二级知识点的掌握等级；level 传 null 表示取消等级 */
+export const setQuestionSubLevel = (data: {
+  knowledgeTag?: string | null
+  name: string
+  level: 'basic' | 'medium' | 'advanced' | null
+}): Promise<{ name: string; level: string | null }> =>
+  request.patch('/questions/subtag-level', data)
 
 export interface UpdateSubTagPayload {
   /** 原二级知识点名称 */
@@ -62,8 +74,7 @@ export interface UpdateSubTagPayload {
 /** 编辑二级知识点：重命名 / 合并 / 删除（移回未分类）/ 更换所属题库 */
 export const updateQuestionSubTag = (
   data: UpdateSubTagPayload
-): Promise<{ updated: number; cleared: boolean }> =>
-  request.patch('/questions/update-subtag', data)
+): Promise<{ updated: number; cleared: boolean }> => request.patch('/questions/update-subtag', data)
 export const createQuestion = (data: Partial<Question>) => request.post('/questions', data)
 export const updateQuestion = (id: number, data: Partial<Question>) =>
   request.patch(`/questions/${id}`, data)
