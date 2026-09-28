@@ -1,25 +1,8 @@
-// ECharts 公共封装：统一注册组件、初始化、自适应、销毁，避免页面重复样板代码
-import * as echarts from 'echarts/core'
-import { PieChart, BarChart, LineChart } from 'echarts/charts'
-import {
-  TitleComponent,
-  TooltipComponent,
-  LegendComponent,
-  GridComponent
-} from 'echarts/components'
-import { CanvasRenderer } from 'echarts/renderers'
+// ECharts 公共封装：统一初始化、自适应、销毁，避免页面重复样板代码。
+// 按需注册（Pie/Bar/Line + Title/Tooltip/Legend/Grid + Canvas）抽到 utils/echarts.ts，
+// 与「插入图表」对话框共用同一份实例，避免重复 use。
+import echarts from '../utils/echarts'
 import { onBeforeUnmount } from 'vue'
-
-echarts.use([
-  PieChart,
-  BarChart,
-  LineChart,
-  TitleComponent,
-  TooltipComponent,
-  LegendComponent,
-  GridComponent,
-  CanvasRenderer
-])
 
 export function useECharts() {
   const charts: ReturnType<typeof echarts.init>[] = []

@@ -135,6 +135,23 @@
           </svg>
         </button>
       </el-tooltip>
+      <el-tooltip content="插入图表" placement="top" :show-after="400">
+        <button type="button" :class="{ active: diagramVisible }" @click="diagramVisible = true">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M3 3v18h18" />
+            <rect width="3.6" height="7" x="7" y="11" rx="1" />
+            <rect width="3.6" height="11" x="12.2" y="7" rx="1" />
+            <rect width="3.6" height="4.6" x="17.4" y="13.4" rx="1" />
+          </svg>
+        </button>
+      </el-tooltip>
       <el-dropdown trigger="click" @command="onTableCommand">
         <button type="button" class="re-table-btn">
           <svg
@@ -322,6 +339,10 @@
         <el-button type="primary" :loading="aiApplying" @click="applyAiResult">替换内容</el-button>
       </template>
     </el-dialog>
+
+    <!-- 插入图表：Mermaid / ECharts 渲染成 PNG → 上传 OSS → 以 <img> 插入。
+         消毒器会剥掉 <svg>/<canvas>，位图是唯一能穿过保存与导出链路的形态。 -->
+    <DiagramDialog v-model="diagramVisible" @insert="onDiagramInsert" />
   </div>
 </template>
 
@@ -348,6 +369,7 @@ import {
   renderMathInHtml
 } from '../utils/mathRender'
 import { normalizeAiMathHtml, validateAiMath } from '../utils/aiMath'
+import DiagramDialog from './DiagramDialog.vue'
 
 const props = defineProps<{
   modelValue: string
@@ -704,6 +726,25 @@ const onFileChange = async (e: Event) => {
   const file = input.files?.[0]
   if (file) await uploadAndInsert(file)
   input.value = ''
+}
+
+/* ===================== 插入图表（Mermaid / ECharts） ===================== */
+const diagramVisible = ref(false)
+
+// 图表已由对话框渲染成 PNG 并上传 OSS，这里只负责按指定宽度插入图片节点。
+// 用 insertContent 而不是 setImage：ResizableImage 在 schema 上多声明了 width，
+// 但 setImage 的命令类型签名只认 src/alt/title，走 JSON 内容才能把宽度一起写进节点
+// （宽度落库后仍可点击图片继续缩放）。
+const onDiagramInsert = (payload: { url: string; width: number }) => {
+  editor.value
+    ?.chain()
+    .focus()
+    .insertContent({
+      type: 'image',
+      attrs: { src: payload.url, width: String(Math.round(payload.width)) }
+    })
+    .run()
+  ElMessage.success('图表已插入')
 }
 
 // 弹窗输入 LaTeX 后插入 $...$ 公式
