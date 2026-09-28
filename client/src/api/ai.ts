@@ -39,6 +39,10 @@ export const generateConclusion = (data: AiConclusionPayload): Promise<AiConclus
 export interface ConclusionStreamHandlers {
   // piece：本次增量文本；full：到目前为止的完整文本
   onDelta?: (piece: string, full: string) => void
+  // 上游已连接（可以提示「已连接模型，等待输出…」）
+  onConnected?: () => void
+  // 推理型模型的思考进度（累计字数）；这类模型会先思考很久，必须给用户可见的进度
+  onThinking?: (chars: number) => void
 }
 
 export const generateConclusionStream = async (
@@ -104,6 +108,10 @@ export const generateConclusionStream = async (
             full += piece
             handlers.onDelta?.(piece, full)
           }
+        } else if (evt.type === 'status') {
+          if (evt.phase === 'connected') handlers.onConnected?.()
+        } else if (evt.type === 'thinking') {
+          handlers.onThinking?.(Number(evt.chars) || 0)
         } else if (evt.type === 'error') {
           // 后端已把上游原文/超时原因翻译成人话，直接抛出去给对话框展示
           throw new Error(evt.message || '生成失败，请稍后重试')

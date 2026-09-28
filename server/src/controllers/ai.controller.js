@@ -193,6 +193,9 @@ async function callChat({ key, base, model, messages, temperature = 0.2, maxToke
 
 // 调用上游 /chat/completions 并开启 stream:true，逐段回调 onDelta。
 // 返回 { text, truncated }：text 是拼接后的完整文本，truncated 表示被 max_tokens 截断。
+// onStatus('connected')：上游已返回响应头（区分「还在连」与「连上了但还没吐字」）
+// onThink(chars)：推理型模型（deepseek-reasoner 等）先流式吐思考过程，
+//   这类分片没有 content，必须当进度上报，否则前端看着像卡死
 async function streamChat({
   key,
   base,
@@ -201,6 +204,8 @@ async function streamChat({
   temperature = 0.2,
   maxTokens = 4096,
   onDelta,
+  onStatus,
+  onThink,
   signal
 }) {
   const controller = new AbortController()
@@ -261,9 +266,12 @@ async function streamChat({
       throw err
     }
 
+    onStatus?.('connected')
     const reader = resp.body.getReader()
     const decoder = new TextDecoder()
     let buf = ''
+    let thinkChars = 0
+    let thinkReported = false
     for (;;) {
       const { done, value } = await reader.read()
       if (done) break
@@ -291,15 +299,30 @@ async function streamChat({
           throw err
         }
         const choice = json?.choices?.[0]
-        const piece = String(choice?.delta?.content || '')
+        const delta = choice?.delta || {}
+        // 兼容两种形态：字符串，或 [{ type:'text', text:'…' }] 数组
+        const pick = (v) =>
+          typeof v === 'string' ? v : Array.isArray(v) ? v.map((p) => p?.text || '').join('') : ''
+        const piece = pick(delta.content)
         if (piece) {
+          // 正文开始时把思考阶段的最终字数补报一次（平时按 1s 节流，别让计数停在半路）
+          if (!thinkReported && thinkChars) {
+            thinkReported = true
+            onThink?.(thinkChars, true)
+          }
           text += piece
           onDelta?.(piece)
+        }
+        // 推理过程（deepseek-reasoner / 部分中转）：只用来显示「思考中」，不进正文
+        const think = pick(delta.reasoning_content) || pick(delta.reasoning)
+        if (think) {
+          thinkChars += think.length
+          if (!thinkReported) onThink?.(thinkChars)
         }
         if (choice?.finish_reason === 'length') truncated = true
       }
     }
-    return { text, truncated }
+    return { text, truncated, thinkChars }
   } catch (e) {
     // 上游真实报错原样抛出；中止类错误统一成带 streamAbort 标记的错误，供文案映射
     if (e?.httpStatus) throw e
@@ -713,9 +736,11 @@ exports.generateConclusion = async (req, res, next) => {
 
 // 结论生成（流式 / SSE）：边生成边回传，解决「长时间没有响应 → 整体超时 → 生成失败」。
 // 事件格式（每行 data: 后跟一个 JSON）：
-//   { type: 'delta', text: '…' }        增量文本
-//   { type: 'done', truncated: false }  正常结束（truncated=true 表示被 max_tokens 截断）
-//   { type: 'error', message: '…' }     失败（HTTP 状态仍是 200，原因在事件体里）
+//   { type: 'status',  phase: 'connected' }  上游已连接（区分「正在连接」与「连上了还没吐字」）
+//   { type: 'thinking', chars: N }           推理型模型的思考进度（节流上报，不进正文）
+//   { type: 'delta',   text: '…' }           增量正文
+//   { type: 'done',    truncated: false }    正常结束（truncated=true 表示被 max_tokens 截断）
+//   { type: 'error',   message: '…' }        失败（HTTP 状态仍是 200，原因在事件体里）
 exports.generateConclusionStream = async (req, res) => {
   const { title, intro, categoryName, apiKey, baseUrl, model } = req.body || {}
   if (!title || !String(title).trim()) return fail(res, 40000, '请先填写结论标题')
@@ -754,8 +779,11 @@ exports.generateConclusionStream = async (req, res) => {
     abort.abort()
   })
 
+  const t0 = Date.now()
+  let firstContentAt = 0
+  let lastThinkSent = 0
   try {
-    const { text, truncated } = await streamChat({
+    const { text, truncated, thinkChars } = await streamChat({
       ...target,
       temperature: 0.3,
       messages: [
@@ -763,16 +791,41 @@ exports.generateConclusionStream = async (req, res) => {
         { role: 'user', content: buildConclusionUserContent({ title, intro, categoryName }) }
       ],
       signal: abort.signal,
-      onDelta: (piece) => send({ type: 'delta', text: piece })
+      // 上游响应头已到：前端可以从「正在连接」切换到「已连接，等待输出」
+      onStatus: () => send({ type: 'status', phase: 'connected' }),
+      onDelta: (piece) => {
+        if (!firstContentAt) {
+          firstContentAt = Date.now()
+          console.log(`[ai] 结论生成：上游已开始输出正文（${firstContentAt - t0}ms）`)
+        }
+        send({ type: 'delta', text: piece })
+      },
+      // 思考过程按秒节流上报；正文开始时会带 force=true 补报最终字数
+      onThink: (chars, force) => {
+        const now = Date.now()
+        if (!force && now - lastThinkSent < 1000) return
+        lastThinkSent = now
+        send({ type: 'thinking', chars })
+      }
     })
     if (closed) return
     if (!text.trim()) {
-      send({ type: 'error', message: 'AI 没有返回内容，请重试或换个模型' })
+      // 只思考没正文的情况要单独提示，否则老师会以为是卡住了
+      send({
+        type: 'error',
+        message: thinkChars
+          ? `模型只输出了思考过程（${thinkChars} 字）没有给出正文。可重试、或在「系统设置」里换成非推理模型（如 deepseek-chat）`
+          : 'AI 没有返回内容，请重试或换个模型'
+      })
       return res.end()
     }
+    console.log(
+      `[ai] 结论生成完成：用时 ${Date.now() - t0}ms，思考 ${thinkChars} 字，正文 ${text.length} 字`
+    )
     send({ type: 'done', truncated })
     res.end()
   } catch (e) {
+    console.log(`[ai] 结论生成失败：用时 ${Date.now() - t0}ms，原因 ${e?.message || e}`)
     if (closed) return
     send({ type: 'error', message: describeStreamError(e, target.base) })
     res.end()

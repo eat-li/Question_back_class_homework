@@ -38,9 +38,7 @@
         >换一版</el-button
       >
       <el-button v-if="loading" text type="danger" @click="stopStreaming">停止生成</el-button>
-      <span v-if="loading" class="ac-stream-hint">
-        {{ streamChars ? `已接收 ${streamChars} 字` : '等待模型返回…' }} · {{ waitingSec }}s
-      </span>
+      <span v-if="loading" class="ac-stream-hint"> {{ streamHint }} · {{ waitingSec }}s </span>
     </div>
 
     <el-alert
@@ -108,6 +106,17 @@ const hasResult = computed(() => Boolean(rawHtml.value))
 const streamChars = ref(0)
 const waitingSec = ref(0)
 const streamRaw = ref('')
+// 连接阶段：connecting（还没连上上游）→ connected（连上了但可能还没吐字）
+const streamPhase = ref<'connecting' | 'connected'>('connecting')
+// 推理型模型（deepseek-reasoner 等）的思考进度：这类模型会先思考很久，
+// 不显示进度的话界面看着就像卡死
+const thinkChars = ref(0)
+const streamHint = computed(() => {
+  if (thinkChars.value) return `模型思考中…（已 ${thinkChars.value} 字思考，正文随后输出）`
+  if (streamChars.value) return `已接收 ${streamChars.value} 字`
+  if (streamPhase.value === 'connected') return '已连接模型，等待输出…'
+  return '正在连接模型…'
+})
 
 let streamAbort: AbortController | null = null
 let waitTimer: number | undefined
@@ -191,6 +200,8 @@ const generate = async () => {
   streamRaw.value = ''
   streamChars.value = 0
   waitingSec.value = 0
+  streamPhase.value = 'connecting'
+  thinkChars.value = 0
 
   const startedAt = Date.now()
   clearWaitTimer()
@@ -209,6 +220,15 @@ const generate = async () => {
         ...creds
       },
       {
+        // 上游已连接：把「正在连接模型…」换成「已连接模型，等待输出…」
+        onConnected: () => {
+          streamPhase.value = 'connected'
+        },
+        // 推理型模型的思考进度：这段可能持续几十秒到几分钟，
+        // 必须显示出来，否则用户会以为卡死
+        onThinking: (chars) => {
+          thinkChars.value = chars
+        },
         // 分片到达：累积原文，并按 200ms 节流刷新预览（避免每个字都重排一次公式）
         onDelta: (_piece, full) => {
           streamRaw.value = full
